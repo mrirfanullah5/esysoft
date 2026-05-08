@@ -1,0 +1,11 @@
+{
+    "version": "1.1",
+    "notes": "EsySoft School Management System - New Version 1.1",
+    "pub_date": "2026-05-08T10:15:00Z",
+    "platforms": {
+      "windows-x86_64": {
+        "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaVBEeVE5MGxDQ0lSeGRtRGJwSVJvaThZdEp4NEJ1OTBvdnBFNkluYWo2TUluVjRrSjBUeGVETU1oRFRkbzVZMFdhdW5NT2hoaGNLdEE5WUFOVGhOM1JkQ21pY1NPdndJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MTc5NTYxCWZpbGU6RVNZU09GVF8wLjEuMV94NjQtc2V0dXAuZXhlCnRsM0ZFNytTTEJ3SG94MTBxSGJ6a3p1eSt1RnBJNThlY2l2ODk3T2orNFZYMVJtTzJMdktIWUsxU1lsNjZRODR6YldTanY0SFRVcEZieW16Mm53ZkNnPT0K",
+        "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.1/ESYSOFT_0.1.1-x64-setup.exe"
+      }
+    }
+  }
