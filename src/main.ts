@@ -2,6 +2,10 @@ import './style.css'
 
 type Route = 'login' | 'home'
 
+/** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
+const ESYSOFT_APP_VERSION = '1.2.0'
+const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
+
 const DEFAULT_PIN = '000000'
 const PIN_STORAGE_KEY = 'esysoft.pin.v1'
 const THEME_STORAGE_KEY = 'esysoft.theme.v1'
@@ -443,6 +447,7 @@ function formatHeaderTime(d: Date) {
 type NavId =
   | 'new-entry'
   | 'weapon'
+  | 'general'
   | 'expense'
   | 'dues'
   | 'search'
@@ -453,25 +458,17 @@ type NavId =
 function buildSidebar(active: NavId | null, opts?: { onActiveNav?: (nav: NavId | null) => void }) {
   const sidebar = makeEl('aside', { className: 'nav' })
   sidebar.innerHTML = `
-    <div class="nav-title">MENU</div>
-    <button class="nav-btn nav-blue" data-nav="new-entry" type="button">${ICON_PLUS}<span>New Entry</span></button>
-    <button class="nav-btn nav-green" data-nav="weapon" type="button">${ICON_TAG}<span>Wepon Number Alot</span></button>
-    <button class="nav-btn nav-amber" data-nav="expense" type="button">${ICON_RECEIPT}<span>Expence</span></button>
-    <button class="nav-btn nav-orange" data-nav="dues" type="button">${ICON_COIN}<span>Dues</span></button>
-    <button class="nav-btn nav-cyan" data-nav="search" type="button">${ICON_DOC}<span>Serch</span></button>
-    <button class="nav-btn nav-red" data-nav="recycle" type="button">${ICON_TRASH}<span>Recyle Bin</span></button>
-    <button class="nav-btn nav-purple" data-nav="report" type="button">${ICON_CHART}<span>Reports</span></button>
-    <div class="nav-sep"></div>
-    <div class="nav-title">SYSTEM</div>
-    <button class="nav-btn nav-gray" data-nav="settings" type="button">${ICON_GEAR}<span>Settings</span></button>
-    <div class="nav-sep"></div>
-    <button class="nav-btn nav-red" data-nav="logout" type="button">${ICON_LOCK}<span>Log out</span></button>
+    <div class="nav-brand">
+      <div class="nav-brand-line" aria-hidden="true"></div>
+      <div class="nav-brand-sub">SLIDE BAR</div>
+    </div>
+    <div class="nav-stats" aria-label="Dashboard status summary"></div>
   `
 
   const setActiveClasses = (next: NavId | null) => {
     sidebar.querySelectorAll<HTMLButtonElement>('button[data-nav]').forEach((btn) => {
-      const bid = btn.getAttribute('data-nav') as NavId | 'logout' | null
-      if (!bid || bid === 'logout') return
+      const bid = btn.getAttribute('data-nav') as NavId | null
+      if (!bid) return
       btn.classList.toggle('is-active', next === bid)
       btn.classList.toggle('is-dim', next !== null && next !== bid)
     })
@@ -482,7 +479,7 @@ function buildSidebar(active: NavId | null, opts?: { onActiveNav?: (nav: NavId |
   return { el: sidebar, setActive: setActiveClasses }
 }
 
-function makeDeskTopbar() {
+function makeDeskTopbar(opts?: { onLogout?: () => void }) {
   const topbar = makeEl('header', { className: 'topbar topbar-dark' })
   topbar.innerHTML = `
     <div class="top-left">
@@ -493,7 +490,10 @@ function makeDeskTopbar() {
       <div class="sub-center">Application Tracking System</div>
     </div>
     <div class="top-right">
-      <div class="dt"><span class="dt-date"></span><span class="dt-sep">•</span><span class="dt-time"></span></div>
+      <div class="top-actions">
+        <div class="dt"><span class="dt-date"></span><span class="dt-sep">•</span><span class="dt-time"></span></div>
+        ${opts?.onLogout ? `<button type="button" class="top-logout" aria-label="Log out">${ICON_LOCK}</button>` : ``}
+      </div>
     </div>
   `
   const dateEl = topbar.querySelector<HTMLSpanElement>('.dt-date')
@@ -512,13 +512,14 @@ function makeDeskTopbar() {
     },
     { once: true },
   )
+  topbar.querySelector<HTMLButtonElement>('.top-logout')?.addEventListener('click', () => opts?.onLogout?.())
   return topbar
 }
 
 function makeHome(opts: { onLogout: () => void }) {
   const app = makeEl('section', { className: 'desk dark' })
 
-  const topbar = makeDeskTopbar()
+  const topbar = makeDeskTopbar({ onLogout: opts.onLogout })
 
   const content = makeEl('div', { className: 'desk-content desk-dark' })
 
@@ -563,36 +564,398 @@ function makeHome(opts: { onLogout: () => void }) {
       <p class="welcome-esc-hint">Press ESC to go back.</p>
     </div>
     <footer class="welcome-foot">
-      <span class="welcome-ver">EsySoft v3.0</span>
+      <span class="welcome-ver">${ESYSOFT_VERSION_LABEL}</span>
       <span class="welcome-keys">ESC×2 — Home | ESC — Back</span>
     </footer>
   `
   const dashView = makeEl('div', { className: 'dash-view' })
   const entryView = makeEl('div', { className: 'entry-view is-hidden' })
+  const homeMenuView = makeEl('section', { className: 'home-tiles-view is-hidden' })
+  homeMenuView.innerHTML = `
+    <div class="home-tiles-card">
+    <div class="home-title">
+      <div class="home-kicker">Application Tracking Panel</div>
+      <div class="home-ver">${ESYSOFT_VERSION_LABEL}</div>
+      <div class="home-name">EsySoft Dashboard</div>
+    </div>
+    <div class="home-tiles-grid" role="navigation" aria-label="Main dashboard actions">
+      <button type="button" class="tile tone-dash-1" data-home-act="new-entry">
+        <div class="tile-ico">${ICON_PLUS}</div>
+        <div class="tile-label">New Entry</div>
+      </button>
+      <button type="button" class="tile tone-dash-2" data-home-act="general">
+        <div class="tile-ico">${ICON_DOC}</div>
+        <div class="tile-label">Genral Entry</div>
+      </button>
+      <button type="button" class="tile tone-dash-3" data-home-act="weapon">
+        <div class="tile-ico">${ICON_TAG}</div>
+        <div class="tile-label">Wepon Number Alot</div>
+      </button>
+      <button type="button" class="tile tone-dash-4" data-home-act="expense">
+        <div class="tile-ico">${ICON_RECEIPT}</div>
+        <div class="tile-label">Expence</div>
+      </button>
+      <button type="button" class="tile tone-dash-5" data-home-act="dues">
+        <div class="tile-ico">${ICON_COIN}</div>
+        <div class="tile-label">Dues</div>
+      </button>
+      <button type="button" class="tile tone-dash-6" data-home-act="search">
+        <div class="tile-ico">${ICON_SEARCH}</div>
+        <div class="tile-label">Serch</div>
+      </button>
+      <button type="button" class="tile tone-dash-7" data-home-act="search-police">
+        <div class="tile-ico">${ICON_SEARCH}</div>
+        <div class="tile-label">Search by Police Station</div>
+      </button>
+      <button type="button" class="tile tone-dash-8" data-home-act="recycle">
+        <div class="tile-ico">${ICON_TRASH}</div>
+        <div class="tile-label">Recyle Bin</div>
+      </button>
+      <button type="button" class="tile tone-dash-9" data-home-act="report">
+        <div class="tile-ico">${ICON_CHART}</div>
+        <div class="tile-label">Reports</div>
+      </button>
+      <button type="button" class="tile tone-dash-10" data-home-act="settings">
+        <div class="tile-ico">${ICON_GEAR}</div>
+        <div class="tile-label">Settings</div>
+      </button>
+    </div>
+    </div>
+  `
 
   type Filter = 'all' | 'completed' | 'showAll'
   let filter: Filter = 'all'
   let dashSearchQuery = ''
 
-  const stats = makeEl('div', { className: 'stats' })
+  const stats = makeEl('div', { className: 'stats stats-side' })
+  let didStatsIntro = false
+  stats.innerHTML = `
+    <div class="stats-section stats-reminder" data-sec="reminder">
+      <div class="stat-group-title stat-anim" style="--i:0">Reminder Activity</div>
+      <div class="stat stat-anim" style="--i:0">
+        <div class="stat-h">Active</div><div class="stat-n" data-k="active">0</div>
+      </div>
+      <div class="stat stat-anim" style="--i:1">
+        <div class="stat-h">Urgent</div><div class="stat-n" data-k="urgent">0</div>
+      </div>
+      <div class="stat stat-anim" style="--i:2">
+        <div class="stat-h">Normal</div><div class="stat-n" data-k="normal">0</div>
+      </div>
+      <div class="stat stat-anim" style="--i:3">
+        <div class="stat-h">Other</div><div class="stat-n" data-k="other">0</div>
+      </div>
+      <div class="stat stat-warn stat-anim" style="--i:4">
+        <div class="stat-h">Warning</div><div class="stat-n" data-k="warning">0</div>
+        <div class="stat-warn-caption">Urgent / Other · up to 7 days left (same as startup reminder)</div>
+      </div>
+      <div class="stat stat-anim" style="--i:5">
+        <div class="stat-h">Complete</div><div class="stat-n" data-k="complete">0</div>
+      </div>
+    </div>
+
+    <div class="stats-section stats-urgent is-hidden" data-sec="urgentSlide" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Urgent Reminders</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Records</div><div class="stat-n" data-k="urgCount">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">Next due</div><div class="stat-n" data-k="urgNext">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:3"><div class="stat-h">1</div><div class="stat-n" data-k="urgRow1">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:4"><div class="stat-h">2</div><div class="stat-n" data-k="urgRow2">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:5"><div class="stat-h">3</div><div class="stat-n" data-k="urgRow3">—</div></div>
+    </div>
+
+    <div class="stats-section stats-other is-hidden" data-sec="otherSlide" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Other Reminders</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Records</div><div class="stat-n" data-k="othCount">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">Next due</div><div class="stat-n" data-k="othNext">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:3"><div class="stat-h">1</div><div class="stat-n" data-k="othRow1">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:4"><div class="stat-h">2</div><div class="stat-n" data-k="othRow2">—</div></div>
+      <div class="stat stat-anim stat-mini stat-textval" style="--j:5"><div class="stat-h">3</div><div class="stat-n" data-k="othRow3">—</div></div>
+    </div>
+
+    <div class="stats-section stats-app-daily is-hidden" data-sec="appDaily" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Application Daily Report</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Total Sale</div><div class="stat-n" data-k="dsale">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">Total Cost</div><div class="stat-n" data-k="dcost">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:3"><div class="stat-h">Total Dues</div><div class="stat-n" data-k="ddues">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:4"><div class="stat-h">Total Expense</div><div class="stat-n" data-k="dexp">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:5"><div class="stat-h">Total Profit</div><div class="stat-n" data-k="dnet">0</div></div>
+    </div>
+
+    <div class="stats-section stats-weapon-daily is-hidden" data-sec="weaponDaily" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Weapon Allot Daily Report</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Total Sale</div><div class="stat-n" data-k="wsale">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">Total Cost</div><div class="stat-n" data-k="wcost">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:3"><div class="stat-h">Total Dues</div><div class="stat-n" data-k="wdues">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:4"><div class="stat-h">Total Profit</div><div class="stat-n" data-k="wprofit">0</div></div>
+    </div>
+
+    <div class="stats-section stats-expense-daily is-hidden" data-sec="expenseDaily" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Daily Expense Report</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Total Expense</div><div class="stat-n" data-k="exptotal">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">Entries</div><div class="stat-n" data-k="expcount">0</div></div>
+    </div>
+
+    <div class="stats-section stats-dues is-hidden" data-sec="dues" aria-hidden="true">
+      <div class="stat-group-title stat-anim" style="--j:0">Pending Dues Report</div>
+      <div class="stat stat-anim stat-mini" style="--j:1"><div class="stat-h">Total Pending</div><div class="stat-n" data-k="pdues">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:2"><div class="stat-h">App Pending</div><div class="stat-n" data-k="papp">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:3"><div class="stat-h">Weapon Pending</div><div class="stat-n" data-k="pwep">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:4"><div class="stat-h">General Pending</div><div class="stat-n" data-k="pgen">0</div></div>
+      <div class="stat stat-anim stat-mini" style="--j:5"><div class="stat-h">Records</div><div class="stat-n" data-k="pcount">0</div></div>
+    </div>
+  `
+
   const refreshStats = () => {
     const entries = loadEntries()
+    const todayIso = isoToday()
     const active = entries.filter((e) => !e.manuallyCompleted).length
     const urgent = entries.filter((e) => !e.manuallyCompleted && e.urgency === 'urgent').length
     const normal = entries.filter((e) => !e.manuallyCompleted && e.urgency === 'normal').length
     const other = entries.filter((e) => !e.manuallyCompleted && e.urgency === 'other').length
     const warning = entries.filter((e) => entryCountsForDashboardWarning(e)).length
     const complete = entries.filter((e) => e.manuallyCompleted).length
-    stats.innerHTML = `
-    <div class="stat"><div class="stat-h">Active</div><div class="stat-n">${active}</div></div>
-    <div class="stat"><div class="stat-h">Urgent</div><div class="stat-n">${urgent}</div></div>
-    <div class="stat"><div class="stat-h">Normal</div><div class="stat-n">${normal}</div></div>
-    <div class="stat"><div class="stat-h">Other</div><div class="stat-n">${other}</div></div>
-    <div class="stat stat-warn"><div class="stat-h">Warning</div><div class="stat-n">${warning}</div><div class="stat-warn-caption">Urgent / Other · up to 7 days left (same as startup reminder)</div></div>
-    <div class="stat"><div class="stat-h">Complete</div><div class="stat-n">${complete}</div></div>
-  `
+    const formatNameDays = (name: string, days: number) => `${name || '—'} · ${days}d`
+    const buildTop = (kind: 'urgent' | 'other') => {
+      const out: { name: string; days: number }[] = []
+      for (const e of entries) {
+        if (e.manuallyCompleted) continue
+        if (e.urgency !== kind) continue
+        const w = kind === 'urgent' ? e.urgentDays : e.otherReminderDays
+        const r = reminderWindowRemaining(e.entryDate, w)
+        if (r == null) continue
+        out.push({ name: (e.name || '').trim(), days: r })
+      }
+      out.sort((a, b) => a.days - b.days || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+      return out
+    }
+    const urgList = buildTop('urgent')
+    const othList = buildTop('other')
+
+    let dailySale = 0
+    let dailyCost = 0
+    let dailyProfit = 0
+    let dailyDues = 0
+    for (const e of entries) {
+      if (e.entryDate !== todayIso) continue
+      dailySale += e.salePrice ?? 0
+      dailyCost += e.costPrice ?? 0
+      dailyProfit += entryLineProfit(e)
+      dailyDues += entryLineDues(e)
+    }
+    const dailyExpense = loadExpenses()
+      .filter((x) => x.entryDate === todayIso)
+      .reduce((a, r) => a + r.amount, 0)
+    const dailyExpenseCount = loadExpenses().filter((x) => x.entryDate === todayIso).length
+
+    const dailyWeaponLines = loadWeaponAllotLines().filter((l) => (l.entryDate || '') === todayIso)
+    let weaponSale = 0
+    let weaponCost = 0
+    let weaponProfit = 0
+    let weaponDues = 0
+    for (const l of dailyWeaponLines) {
+      weaponSale += l.salePrice ?? 0
+      weaponCost += l.costPrice ?? 0
+      weaponProfit += lineProfit(l)
+      weaponDues += lineDues(l)
+    }
+
+    const allEntries = entries
+    const appPendingDues = allEntries.reduce((s, e) => {
+      const d = entryLineDues(e)
+      return d > 0 ? s + d : s
+    }, 0)
+    const weaponPendingDues = loadWeaponAllotLines().reduce((s, l) => {
+      const d = lineDues(l)
+      return d > 0 ? s + d : s
+    }, 0)
+    const generalPendingDues = loadGeneralEntries().reduce((s, r) => s + generalDuesRemaining(r), 0)
+    const pendingCount =
+      allEntries.filter((e) => entryLineDues(e) > 0).length +
+      loadWeaponAllotLines().filter((l) => lineDues(l) > 0).length +
+      loadGeneralEntries().filter((r) => generalDuesRemaining(r) > 0).length
+    const totalPending = appPendingDues + weaponPendingDues + generalPendingDues
+
+    const setTxt = (k: string, v: string) => {
+      const el = stats.querySelector<HTMLElement>(`[data-k="${k}"]`)
+      if (el) el.textContent = v
+    }
+    setTxt('active', String(active))
+    setTxt('urgent', String(urgent))
+    setTxt('normal', String(normal))
+    setTxt('other', String(other))
+    setTxt('warning', String(warning))
+    setTxt('complete', String(complete))
+
+    setTxt('urgCount', String(urgList.length))
+    setTxt('urgNext', urgList[0] ? `${urgList[0].days} day(s)` : '—')
+    setTxt('urgRow1', urgList[0] ? formatNameDays(urgList[0].name, urgList[0].days) : '—')
+    setTxt('urgRow2', urgList[1] ? formatNameDays(urgList[1].name, urgList[1].days) : '—')
+    setTxt('urgRow3', urgList[2] ? formatNameDays(urgList[2].name, urgList[2].days) : '—')
+
+    setTxt('othCount', String(othList.length))
+    setTxt('othNext', othList[0] ? `${othList[0].days} day(s)` : '—')
+    setTxt('othRow1', othList[0] ? formatNameDays(othList[0].name, othList[0].days) : '—')
+    setTxt('othRow2', othList[1] ? formatNameDays(othList[1].name, othList[1].days) : '—')
+    setTxt('othRow3', othList[2] ? formatNameDays(othList[2].name, othList[2].days) : '—')
+    setTxt('dsale', formatRs(dailySale))
+    setTxt('dcost', formatRs(dailyCost))
+    setTxt('ddues', formatRs(dailyDues))
+    setTxt('dexp', formatRs(dailyExpense))
+    setTxt('dnet', formatRs(dailyProfit - dailyExpense))
+    setTxt('wsale', formatRs(weaponSale))
+    setTxt('wcost', formatRs(weaponCost))
+    setTxt('wdues', formatRs(weaponDues))
+    setTxt('wprofit', formatRs(weaponProfit))
+    setTxt('exptotal', formatRs(dailyExpense))
+    setTxt('expcount', String(dailyExpenseCount))
+    setTxt('pdues', formatRs(totalPending))
+    setTxt('papp', formatRs(appPendingDues))
+    setTxt('pwep', formatRs(weaponPendingDues))
+    setTxt('pgen', formatRs(generalPendingDues))
+    setTxt('pcount', String(pendingCount))
+
+    if (!didStatsIntro) {
+      didStatsIntro = true
+      const reminder = stats.querySelector<HTMLElement>('[data-sec="reminder"]')
+      const urgentSlide = stats.querySelector<HTMLElement>('[data-sec="urgentSlide"]')
+      const otherSlide = stats.querySelector<HTMLElement>('[data-sec="otherSlide"]')
+      const appDaily = stats.querySelector<HTMLElement>('[data-sec="appDaily"]')
+      const weaponDaily = stats.querySelector<HTMLElement>('[data-sec="weaponDaily"]')
+      const expenseDaily = stats.querySelector<HTMLElement>('[data-sec="expenseDaily"]')
+      const dues = stats.querySelector<HTMLElement>('[data-sec="dues"]')
+
+      const timers: number[] = []
+      const clearTimers = () => {
+        while (timers.length) window.clearTimeout(timers.pop())
+      }
+      const refreshers: number[] = []
+      const clearRefreshers = () => {
+        while (refreshers.length) window.clearInterval(refreshers.pop())
+      }
+      stats.addEventListener(
+        'DOMNodeRemoved',
+        () => {
+          clearTimers()
+          clearRefreshers()
+        },
+        { once: true },
+      )
+
+      const GAP = 1500
+      const DUR = 1800
+      const LAST_I = 5
+      const lastAnimMs = LAST_I * GAP + DUR
+      const AFTER_GAP_MS = 2000
+
+      const hideAll = () => {
+        for (const sec of [reminder, urgentSlide, otherSlide, appDaily, weaponDaily, expenseDaily, dues]) {
+          if (!sec) continue
+          sec.classList.add('is-hidden')
+          sec.setAttribute('aria-hidden', 'true')
+          sec.classList.remove(
+            'rem-intro',
+            'urgent-intro',
+            'other-intro',
+            'app-intro',
+            'weapon-intro',
+            'expense-intro',
+            'dues-intro',
+          )
+        }
+      }
+
+      const showReminder = () => {
+        refreshStats()
+        hideAll()
+        if (!reminder) return
+        reminder.classList.remove('is-hidden')
+        reminder.removeAttribute('aria-hidden')
+        reminder.classList.add('rem-intro')
+        timers.push(
+          window.setTimeout(() => reminder.classList.remove('rem-intro'), lastAnimMs + 400),
+        )
+        timers.push(window.setTimeout(showUrgentSlide, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showUrgentSlide = () => {
+        refreshStats()
+        hideAll()
+        if (!urgentSlide) return
+        urgentSlide.classList.remove('is-hidden')
+        urgentSlide.removeAttribute('aria-hidden')
+        urgentSlide.classList.add('urgent-intro')
+        timers.push(window.setTimeout(() => urgentSlide.classList.remove('urgent-intro'), lastAnimMs + 400))
+        timers.push(window.setTimeout(showOtherSlide, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showOtherSlide = () => {
+        refreshStats()
+        hideAll()
+        if (!otherSlide) return
+        otherSlide.classList.remove('is-hidden')
+        otherSlide.removeAttribute('aria-hidden')
+        otherSlide.classList.add('other-intro')
+        timers.push(window.setTimeout(() => otherSlide.classList.remove('other-intro'), lastAnimMs + 400))
+        timers.push(window.setTimeout(showAppDaily, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showAppDaily = () => {
+        refreshStats()
+        hideAll()
+        if (!appDaily) return
+        appDaily.classList.remove('is-hidden')
+        appDaily.removeAttribute('aria-hidden')
+        appDaily.classList.add('app-intro')
+        timers.push(
+          window.setTimeout(() => appDaily.classList.remove('app-intro'), lastAnimMs + 400),
+        )
+        timers.push(window.setTimeout(showWeaponDaily, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showWeaponDaily = () => {
+        refreshStats()
+        hideAll()
+        if (!weaponDaily) return
+        weaponDaily.classList.remove('is-hidden')
+        weaponDaily.removeAttribute('aria-hidden')
+        weaponDaily.classList.add('weapon-intro')
+        timers.push(
+          window.setTimeout(() => weaponDaily.classList.remove('weapon-intro'), lastAnimMs + 400),
+        )
+        timers.push(window.setTimeout(showExpenseDaily, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showExpenseDaily = () => {
+        refreshStats()
+        hideAll()
+        if (!expenseDaily) return
+        expenseDaily.classList.remove('is-hidden')
+        expenseDaily.removeAttribute('aria-hidden')
+        expenseDaily.classList.add('expense-intro')
+        timers.push(
+          window.setTimeout(() => expenseDaily.classList.remove('expense-intro'), lastAnimMs + 400),
+        )
+        timers.push(window.setTimeout(showDues, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      const showDues = () => {
+        refreshStats()
+        hideAll()
+        if (!dues) return
+        dues.classList.remove('is-hidden')
+        dues.removeAttribute('aria-hidden')
+        dues.classList.add('dues-intro')
+        timers.push(window.setTimeout(() => dues.classList.remove('dues-intro'), lastAnimMs + 400))
+        timers.push(window.setTimeout(showReminder, lastAnimMs + AFTER_GAP_MS))
+      }
+
+      // Keep values fresh while software stays ON (no need to off/on).
+      refreshers.push(window.setInterval(() => refreshStats(), 2000))
+
+      showReminder()
+    }
   }
   refreshStats()
+  sidebar.el.querySelector('.nav-stats')?.append(stats)
 
   const toolbar = makeEl('div', { className: 'toolbar' })
   toolbar.innerHTML = `
@@ -650,6 +1013,14 @@ function makeHome(opts: { onLogout: () => void }) {
     entryView.replaceChildren(makeNewEntry({ onBack: showDashboard, initial: entry }))
   }
 
+  const showEntryNewUnder = (ins: NewEntryInsertOpts) => {
+    sidebar.setActive('new-entry')
+    welcomeView.classList.add('is-hidden')
+    dashView.classList.add('is-hidden')
+    entryView.classList.remove('is-hidden')
+    entryView.replaceChildren(makeNewEntry({ onBack: showDashboard, draft: ins.draft, insertAfterId: ins.insertAfterId }))
+  }
+
   const dailyStatsEl = toolbar.querySelector('.dash-daily-stats')
   const refreshDashDailyLine = () => {
     const todayIso = isoToday()
@@ -675,7 +1046,8 @@ function makeHome(opts: { onLogout: () => void }) {
   const renderRows = () => {
     refreshStats()
     refreshDashDailyLine()
-    const all = loadEntries().slice().reverse()
+    // Storage order (oldest → newest) so new saves append at bottom.
+    const all = loadEntries().slice()
     const filtered = filter === 'completed' ? all.filter((e) => e.manuallyCompleted) : all
     const take = filter === 'showAll' ? filtered : filtered.slice(0, 200)
     const searchActive = dashSearchQuery.trim().length > 0
@@ -683,7 +1055,8 @@ function makeHome(opts: { onLogout: () => void }) {
     const buckets = dashboardCnicBuckets(take, searched, searchActive)
     const html = buckets
       .map((bucket, idx) => {
-        const rep = bucket[0]
+        // Show the most recent entry in the group, but keep group's position stable.
+        const rep = bucket[bucket.length - 1] ?? bucket[0]
         const n = bucket.length
         const status = entryStatusLabel(rep)
         const trackingCell =
@@ -751,7 +1124,7 @@ function makeHome(opts: { onLogout: () => void }) {
     if (!entry) return
     const act = actBtn.getAttribute('data-act')
     if (act === 'view') {
-      openEntryViewDetailModal(entry, { onEdit: showEntryEdit, onChanged: renderRows })
+      openEntryViewDetailModal(entry, { onEdit: showEntryEdit, onNewEntry: showEntryNewUnder, onChanged: renderRows })
     } else if (act === 'edit') {
       showEntryEdit(entry)
     } else if (act === 'complete') {
@@ -817,9 +1190,13 @@ function makeHome(opts: { onLogout: () => void }) {
   })
 
   const dashMain = makeEl('div', { className: 'dash-main' })
-  dashMain.append(stats, toolbar, tableScroll)
+  const dashActions = makeEl('div', { className: 'dash-actions' })
+  const dashNewBtn = makeEl('button', { className: 'btn primary dash-new', attrs: { type: 'button' } }) as HTMLButtonElement
+  dashNewBtn.innerHTML = `${ICON_PLUS}<span>New Entry</span>`
+  dashActions.append(dashNewBtn)
+  dashMain.append(toolbar, tableScroll, dashActions)
   dashView.append(dashMain)
-  main.append(welcomeView, dashView, entryView)
+  main.append(welcomeView, dashView, entryView, homeMenuView)
   content.append(sidebar.el, main)
   app.append(topbar, content)
 
@@ -829,11 +1206,22 @@ function makeHome(opts: { onLogout: () => void }) {
     dashView.classList.add('is-hidden')
     entryView.classList.add('is-hidden')
     entryView.replaceChildren()
+    homeMenuView.classList.add('is-hidden')
+  }
+
+  const showHomeMenu = () => {
+    sidebar.setActive(null)
+    welcomeView.classList.add('is-hidden')
+    dashView.classList.add('is-hidden')
+    entryView.classList.add('is-hidden')
+    entryView.replaceChildren()
+    homeMenuView.classList.remove('is-hidden')
   }
 
   const showDashboard = () => {
     sidebar.setActive(null)
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.remove('is-hidden')
     entryView.classList.add('is-hidden')
     entryView.replaceChildren()
@@ -844,44 +1232,59 @@ function makeHome(opts: { onLogout: () => void }) {
   const showEntry = () => {
     sidebar.setActive('new-entry')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
-    entryView.replaceChildren(makeNewEntry({ onBack: showDashboard }))
+    entryView.replaceChildren(makeNewEntry({ onBack: showHomeMenu }))
   }
+  dashNewBtn.addEventListener('click', () => showEntry())
 
   const showWeaponAllot = () => {
     sidebar.setActive('weapon')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
-    entryView.replaceChildren(makeWeaponAllotScreen({ onBack: showDashboard }))
+    entryView.replaceChildren(makeWeaponAllotScreen({ onBack: showHomeMenu }))
+  }
+
+  const showGeneral = () => {
+    sidebar.setActive('general')
+    welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
+    dashView.classList.add('is-hidden')
+    entryView.classList.remove('is-hidden')
+    entryView.replaceChildren(makeGeneralEntryScreen({ onBack: showHomeMenu }))
   }
 
   const showExpense = () => {
     sidebar.setActive('expense')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
-    entryView.replaceChildren(makeExpenseScreen({ onBack: showDashboard }))
+    entryView.replaceChildren(makeExpenseScreen({ onBack: showHomeMenu }))
   }
 
   const showDues = () => {
     sidebar.setActive('dues')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
-    entryView.replaceChildren(makeDuesScreen({ onBack: showDashboard }))
+    entryView.replaceChildren(makeDuesScreen({ onBack: showHomeMenu }))
   }
 
   const showSearch = () => {
     sidebar.setActive('search')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
     const renderSearch = () => {
       entryView.replaceChildren(
         makeSearchScreen({
-          onBack: showDashboard,
+          onBack: showHomeMenu,
           onEdit: (entry) => {
             entryView.replaceChildren(makeNewEntry({ onBack: renderSearch, initial: entry }))
           },
@@ -891,13 +1294,33 @@ function makeHome(opts: { onLogout: () => void }) {
     renderSearch()
   }
 
+  const showPoliceStationSearch = () => {
+    sidebar.setActive('search')
+    welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
+    dashView.classList.add('is-hidden')
+    entryView.classList.remove('is-hidden')
+    const render = () => {
+      entryView.replaceChildren(
+        makePoliceStationSearchScreen({
+          onBack: showHomeMenu,
+          onEdit: (entry) => {
+            entryView.replaceChildren(makeNewEntry({ onBack: render, initial: entry }))
+          },
+        }),
+      )
+    }
+    render()
+  }
+
   const showRecycle = () => {
     sidebar.setActive('recycle')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
     const renderRecycle = () => {
-      entryView.replaceChildren(makeRecycleScreen({ onBack: showDashboard, onChanged: renderRecycle }))
+      entryView.replaceChildren(makeRecycleScreen({ onBack: showHomeMenu, onChanged: renderRecycle }))
     }
     renderRecycle()
   }
@@ -905,12 +1328,13 @@ function makeHome(opts: { onLogout: () => void }) {
   const showReports = () => {
     sidebar.setActive('report')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
     const renderReports = () => {
       entryView.replaceChildren(
         makeReportsScreen({
-          onBack: showDashboard,
+          onBack: showHomeMenu,
           onEdit: (entry) => {
             entryView.replaceChildren(makeNewEntry({ onBack: renderReports, initial: entry }))
           },
@@ -923,19 +1347,33 @@ function makeHome(opts: { onLogout: () => void }) {
   const showSettings = () => {
     sidebar.setActive('settings')
     welcomeView.classList.add('is-hidden')
+    homeMenuView.classList.add('is-hidden')
     dashView.classList.add('is-hidden')
     entryView.classList.remove('is-hidden')
-    entryView.replaceChildren(makeSettingsScreen({ onBack: showDashboard }))
+    entryView.replaceChildren(makeSettingsScreen({ onBack: showHomeMenu }))
   }
+
+  homeMenuView.querySelectorAll<HTMLButtonElement>('button[data-home-act]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const act = btn.getAttribute('data-home-act')
+      if (!act) return
+      if (act === 'new-entry') return showEntry()
+      if (act === 'general') return showGeneral()
+      if (act === 'weapon') return showWeaponAllot()
+      if (act === 'expense') return showExpense()
+      if (act === 'dues') return showDues()
+      if (act === 'search') return showSearch()
+      if (act === 'search-police') return showPoliceStationSearch()
+      if (act === 'recycle') return showRecycle()
+      if (act === 'report') return showReports()
+      if (act === 'settings') return showSettings()
+    })
+  })
 
   sidebar.el.querySelectorAll<HTMLButtonElement>('button[data-nav]').forEach((b) => {
     b.addEventListener('click', () => {
       const id = b.getAttribute('data-nav')
       if (!id) return
-      if (id === 'logout') {
-        opts.onLogout()
-        return
-      }
       const nav = id as NavId
       if (nav === 'new-entry') {
         showEntry()
@@ -943,6 +1381,10 @@ function makeHome(opts: { onLogout: () => void }) {
       }
       if (nav === 'weapon') {
         showWeaponAllot()
+        return
+      }
+      if (nav === 'general') {
+        showGeneral()
         return
       }
       if (nav === 'expense') {
@@ -982,6 +1424,15 @@ function makeHome(opts: { onLogout: () => void }) {
       window.removeEventListener('keydown', onHomeEsc)
       return
     }
+    if (e.key === 'F1') {
+      if (document.querySelector('.startup-reminder-overlay')) return
+      if (document.querySelector('.dues-modal-overlay')) return
+      if (document.querySelector('.entry-detail-overlay')) return
+      e.preventDefault()
+      e.stopPropagation()
+      showDashboard()
+      return
+    }
     if (e.key !== 'Escape') return
     if (document.querySelector('.startup-reminder-overlay')) return
     if (document.querySelector('.dues-modal-overlay')) return
@@ -998,7 +1449,7 @@ function makeHome(opts: { onLogout: () => void }) {
       }
       e.preventDefault()
       e.stopPropagation()
-      showDashboard()
+        showHomeMenu()
       return
     }
     if (welcomeActive) {
@@ -1009,7 +1460,7 @@ function makeHome(opts: { onLogout: () => void }) {
       }
       e.preventDefault()
       e.stopPropagation()
-      showDashboard()
+        showHomeMenu()
       return
     }
 
@@ -1023,7 +1474,7 @@ function makeHome(opts: { onLogout: () => void }) {
   }
   window.addEventListener('keydown', onHomeEsc)
 
-  showDashboard()
+  showHomeMenu()
   queueMicrotask(() => maybeOpenStartupReminder())
 
   return app
@@ -1106,20 +1557,8 @@ function dashboardCnicBuckets(takeFiltered: Entry[], searched: Entry[], searchAc
   const keys = [...new Set(takeFiltered.map((e) => cnicGroupingKey(e)))].filter((k) =>
     matchedKeys ? matchedKeys.has(k) : true,
   )
-  const maxDateGroup = (k: string) =>
-    takeFiltered
-      .filter((e) => cnicGroupingKey(e) === k)
-      .reduce<string>((m, x) => {
-        const d = x.entryDate || ''
-        return d > m ? d : m
-      }, '')
-  keys.sort((ka, kb) => maxDateGroup(kb).localeCompare(maxDateGroup(ka)))
-  return keys.map((k) =>
-    takeFiltered
-      .filter((e) => cnicGroupingKey(e) === k)
-      .slice()
-      .sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || '')),
-  )
+  // Preserve storage order so entries appended/inserted appear "under" the record.
+  return keys.map((k) => takeFiltered.filter((e) => cnicGroupingKey(e) === k))
 }
 
 function entryLineProfit(e: Entry) {
@@ -1524,14 +1963,40 @@ function entryCnicDetailKvHtml(e: Entry): string {
     .join('')}</table>`
 }
 
-function openEntryViewDetailModal(entry: Entry, opts: { onEdit?: (e: Entry) => void; onChanged?: () => void } = {}) {
+type NewEntryInsertOpts = {
+  /** Prefill form fields for a new entry (does not create/edit until user saves). */
+  draft?: Partial<
+    Pick<
+      Entry,
+      | 'entryDate'
+      | 'name'
+      | 'fatherName'
+      | 'cnic'
+      | 'trackingId'
+      | 'reference'
+      | 'weaponNumber'
+      | 'policeStation'
+      | 'mobileNumber'
+      | 'category'
+      | 'costPrice'
+      | 'salePrice'
+      | 'cashReceived'
+      | 'urgency'
+      | 'urgentDays'
+      | 'otherReminderDays'
+    >
+  >
+  /** Insert this newly created entry right after the given entry id (storage order). */
+  insertAfterId?: string | null
+}
+
+function openEntryViewDetailModal(
+  entry: Entry,
+  opts: { onEdit?: (e: Entry) => void; onNewEntry?: (ins: NewEntryInsertOpts) => void; onChanged?: () => void } = {},
+) {
   if (document.querySelector('.dues-modal-overlay')) return
   const groupKey = cnicGroupingKey(entry)
-  const loadGroup = () =>
-    loadEntries()
-      .filter((e) => cnicGroupingKey(e) === groupKey)
-      .slice()
-      .sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''))
+  const loadGroup = () => loadEntries().filter((e) => cnicGroupingKey(e) === groupKey)
 
   const overlay = makeEl('div', { className: 'dues-modal-overlay' })
   const modal = makeEl('div', { className: 'dues-modal entry-cnic-group-modal' })
@@ -1613,6 +2078,7 @@ function openEntryViewDetailModal(entry: Entry, opts: { onEdit?: (e: Entry) => v
       </div>
       <div class="dues-modal-actions entry-cnic-group-actions">
         <button type="button" class="btn ghost entry-cnic-detail-close">✕ Close</button>
+        <button type="button" class="btn primary entry-cnic-new-under">${ICON_PLUS}<span>New Entry</span></button>
       </div>
     `
 
@@ -1669,6 +2135,24 @@ function openEntryViewDetailModal(entry: Entry, opts: { onEdit?: (e: Entry) => v
     }
 
     modal.querySelector('.entry-cnic-detail-close')?.addEventListener('click', tearDown)
+    modal.querySelector<HTMLButtonElement>('.entry-cnic-new-under')?.addEventListener('click', () => {
+      const cur = loadEntries().find((x) => x.id === selectedId) ?? selected
+      const draft: NewEntryInsertOpts['draft'] = {
+        entryDate: isoToday(),
+        name: (cur.name || '').trim(),
+        fatherName: (cur.fatherName || '').trim(),
+        cnic: (cur.cnic || '').trim(),
+        mobileNumber: (cur.mobileNumber || '').trim(),
+        policeStation: (cur.policeStation || '').trim(),
+        category: (cur.category || '').trim(),
+        urgency: cur.urgency,
+        urgentDays: cur.urgentDays,
+        otherReminderDays: cur.otherReminderDays,
+      }
+      const insertAfterId = selectedId
+      tearDown()
+      opts.onNewEntry?.({ draft, insertAfterId })
+    })
   }
 
   render()
@@ -2719,6 +3203,66 @@ type ExpenseLine = {
 
 const EXPENSE_STORAGE_KEY = 'esysoft.expenses.v1'
 
+type GeneralEntryKind = 'dues' | 'expense' | 'other'
+
+type GeneralEntryLine = {
+  id: string
+  entryDate: string
+  description: string
+  amount: number
+  kind: GeneralEntryKind
+  /** For kind=dues: already collected amount (<= amount). */
+  collected?: number
+}
+
+const GENERAL_ENTRY_KEY = 'esysoft.generalEntry.v1'
+
+function loadGeneralEntries(): GeneralEntryLine[] {
+  try {
+    const raw = localStorage.getItem(GENERAL_ENTRY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    let needPersist = false
+    const out: GeneralEntryLine[] = []
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue
+      const r = item as Partial<GeneralEntryLine>
+      const description = typeof r.description === 'string' ? r.description : ''
+      const amount = typeof r.amount === 'number' ? r.amount : NaN
+      if (!description.trim() || !Number.isFinite(amount)) continue
+      const entryDate = typeof r.entryDate === 'string' && r.entryDate ? r.entryDate : isoToday()
+      const id = typeof r.id === 'string' && r.id.length > 0 ? r.id : null
+      const kind: GeneralEntryKind = r.kind === 'dues' || r.kind === 'expense' || r.kind === 'other' ? r.kind : 'other'
+      let collected: number | undefined = undefined
+      if (kind === 'dues') {
+        const c = typeof r.collected === 'number' && Number.isFinite(r.collected) ? r.collected : 0
+        collected = Math.max(0, Math.min(amount, c))
+      }
+      if (!id) {
+        needPersist = true
+        out.push({ id: cryptoId(), entryDate, description, amount, kind, collected })
+      } else {
+        out.push({ id, entryDate, description, amount, kind, collected })
+      }
+    }
+    if (needPersist) saveGeneralEntries(out)
+    return out
+  } catch {
+    return []
+  }
+}
+
+function saveGeneralEntries(rows: GeneralEntryLine[]) {
+  localStorage.setItem(GENERAL_ENTRY_KEY, JSON.stringify(rows))
+}
+
+function generalDuesRemaining(r: GeneralEntryLine): number {
+  if (r.kind !== 'dues') return 0
+  const c = r.collected ?? 0
+  return Math.max(0, r.amount - c)
+}
+
 function loadExpenses(): ExpenseLine[] {
   try {
     const raw = localStorage.getItem(EXPENSE_STORAGE_KEY)
@@ -2942,8 +3486,203 @@ function makeExpenseScreen(opts: { onBack: () => void }) {
   return wrap
 }
 
+function makeGeneralEntryScreen(opts: { onBack: () => void }) {
+  const wrap = makeEl('section', { className: 'entry entry-dark allot-screen allot-screen-general' })
+  const head = makeEl('div', { className: 'allot-head' })
+  const back = makeEl('button', { className: 'mini back', attrs: { type: 'button' } }) as HTMLButtonElement
+  back.textContent = '← Main Screen'
+  back.addEventListener('click', () => opts.onBack())
+  const title = makeEl('div', { className: 'allot-title', text: 'Genral Entry' })
+  head.append(back, title)
+
+  const form = makeEl('form', { className: 'allot-form' })
+  const card = makeEl('div', { className: 'entry-card allot-card' })
+  const mkField = (label: string, el: HTMLElement) => {
+    const w = makeEl('label', { className: 'f' })
+    w.append(makeEl('span', { className: 'fl', text: label }), el)
+    return w
+  }
+  const input = (ph: string, attrs?: Record<string, string>) =>
+    makeEl('input', { className: 'in', attrs: { placeholder: ph, ...attrs } }) as HTMLInputElement
+
+  const entryDate = input('Date', { type: 'date' })
+  entryDate.value = isoToday()
+  const description = input('Description (e.g. Imran ko 500 diye)', { maxlength: '120' })
+  const amount = input('Amount', { inputmode: 'decimal' })
+  const kind = makeEl('select', { className: 'in', attrs: { 'aria-label': 'Type' } }) as HTMLSelectElement
+  kind.innerHTML = `
+    <option value="dues">Dues</option>
+    <option value="expense">Expense</option>
+    <option value="other">Other</option>
+  `
+
+  const actions = makeEl('div', { className: 'allot-actions' })
+  const saveBtn = makeEl('button', { className: 'btn primary allot-save', attrs: { type: 'submit' } }) as HTMLButtonElement
+  saveBtn.textContent = 'Save'
+  const cancelBtn = makeEl('button', { className: 'btn ghost', attrs: { type: 'button' } }) as HTMLButtonElement
+  cancelBtn.textContent = 'Clear'
+  const msg = makeEl('div', { className: 'entry-msg', attrs: { role: 'status' } })
+  actions.append(saveBtn, cancelBtn)
+
+  const kicker = makeEl('div', { className: 'allot-kicker', text: 'New general entry' })
+  let editingId: string | null = null
+
+  const clearEditing = () => {
+    editingId = null
+    kicker.textContent = 'New general entry'
+    saveBtn.textContent = 'Save'
+    entryDate.value = isoToday()
+    description.value = ''
+    amount.value = ''
+    kind.value = 'dues'
+  }
+  cancelBtn.addEventListener('click', () => {
+    clearEditing()
+    msg.textContent = ''
+  })
+
+  const row = makeEl('div', { className: 'allot-fields allot-fields-general' })
+  row.append(mkField('Date', entryDate), mkField('Description', description), mkField('Amount', amount), mkField('Type', kind))
+  card.append(kicker, row, msg, actions)
+  form.append(card)
+
+  const tableScroll = makeEl('div', {
+    className: 'allot-table-scroll allot-table-scroll-general',
+    attrs: { 'aria-label': 'General entry list' },
+  })
+
+  const table = makeEl('div', { className: 'table allot-table allot-table-general' })
+  table.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Description</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `
+  const tbody = table.querySelector<HTMLTableSectionElement>('tbody')
+  tableScroll.append(table)
+
+  const renderRows = () => {
+    const rows = loadGeneralEntries().slice().reverse()
+    const esc = (s: string) => s.replaceAll('<', '&lt;')
+    if (!tbody) return
+    tbody.innerHTML =
+      rows
+        .map((r) => {
+          const rem = r.kind === 'dues' ? generalDuesRemaining(r) : 0
+          const remCell = r.kind === 'dues' ? formatRs(rem) : '—'
+          return `<tr data-id="${escAttr(r.id)}">
+            <td>${esc(formatDateDisplay(r.entryDate))}</td>
+            <td>${esc(r.description)}</td>
+            <td>${esc(r.kind)}</td>
+            <td style="text-align:right">${formatRs(r.amount)}</td>
+            <td style="text-align:right">${remCell}</td>
+            <td class="td-actions">
+              <button type="button" class="btn ghost sm" data-act="edit">Edit</button>
+              <button type="button" class="btn danger sm" data-act="delete">Delete</button>
+            </td>
+          </tr>`
+        })
+        .join('') || `<tr><td colspan="6" class="empty">No records yet.</td></tr>`
+  }
+
+  table.addEventListener('click', async (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]')
+    if (!b) return
+    const tr = b.closest('tr[data-id]')
+    const id = tr?.getAttribute('data-id')
+    if (!id) return
+    const act = b.getAttribute('data-act')
+    if (!act) return
+    const all = loadGeneralEntries()
+    const cur = all.find((x) => x.id === id)
+    if (!cur) return
+    if (act === 'edit') {
+      editingId = id
+      kicker.textContent = 'Edit general entry'
+      saveBtn.textContent = 'Save changes'
+      entryDate.value = cur.entryDate || isoToday()
+      description.value = cur.description
+      amount.value = String(cur.amount)
+      kind.value = cur.kind
+      msg.textContent = ''
+      return
+    }
+    if (act === 'delete') {
+      if (
+        !(await confirmModal({
+          title: 'Delete general entry',
+          message: 'Delete this record?',
+          confirmText: 'Delete',
+          cancelText: 'Cancel',
+          variant: 'danger',
+        }))
+      )
+        return
+      const next = all.filter((x) => x.id !== id)
+      saveGeneralEntries(next)
+      msg.textContent = 'Deleted.'
+      renderRows()
+    }
+  })
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const desc = description.value.trim()
+    const am = parseNumOrNull(amount.value)
+    const k = (kind.value as GeneralEntryKind) || 'other'
+    if (!desc) {
+      msg.textContent = 'Description required.'
+      return
+    }
+    if (am === null || am <= 0) {
+      msg.textContent = 'Enter valid amount.'
+      return
+    }
+    const all = loadGeneralEntries()
+    if (editingId) {
+      const ix = all.findIndex((x) => x.id === editingId)
+      if (ix < 0) {
+        msg.textContent = 'Record not found.'
+        clearEditing()
+        renderRows()
+        return
+      }
+      const prev = all[ix]
+      const prevCollected = prev.kind === 'dues' ? prev.collected ?? 0 : 0
+      const nextCollected = k === 'dues' ? Math.max(0, Math.min(am, prevCollected)) : undefined
+      all[ix] = { ...prev, entryDate: entryDate.value || isoToday(), description: desc, amount: am, kind: k, collected: nextCollected }
+      saveGeneralEntries(all)
+      msg.textContent = 'Updated.'
+      clearEditing()
+      renderRows()
+      return
+    }
+    const row: GeneralEntryLine = {
+      id: cryptoId(),
+      entryDate: entryDate.value || isoToday(),
+      description: desc,
+      amount: am,
+      kind: k,
+      collected: k === 'dues' ? 0 : undefined,
+    }
+    all.push(row)
+    saveGeneralEntries(all)
+    msg.textContent = 'Saved.'
+    clearEditing()
+    renderRows()
+  })
+
+  renderRows()
+  wrap.append(head, form, tableScroll)
+  return wrap
+}
+
 type DuesRow = {
-  kind: 'app' | 'weapon'
+  kind: 'app' | 'weapon' | 'general'
   /** App: `appDuesGroupKey`; weapon: client map key (trimmed or "(No client)") */
   groupKey: string
   count: number
@@ -3098,6 +3837,70 @@ function printDuesReferenceDetail(entries: Entry[]) {
   printFullDocument(doc)
 }
 
+function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
+  const usable = lines.filter((r) => r.kind === 'dues' && generalDuesRemaining(r) > 0)
+  if (!usable.length) return
+  const sorted = usable
+    .slice()
+    .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
+  const label = (sorted[0]?.description || '').trim() || 'General'
+  const total = sorted.reduce((s, r) => s + generalDuesRemaining(r), 0)
+
+  const rows = sorted
+    .map((r, i) => {
+      const rem = generalDuesRemaining(r)
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${escHtml(r.entryDate || '—')}</td>
+        <td style="text-align:right">${escHtml(formatRs(r.amount))}</td>
+        <td style="text-align:right">${escHtml(formatRs(rem))}</td>
+        <td>${rem > 0 ? '☐ Active' : '☑ Paid'}</td>
+      </tr>`
+    })
+    .join('')
+
+  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<title>${escAttr(`General dues — ${label}`)}</title>
+<style>
+  :root{--bg:#0b1224;--card:#0f172a;--line:rgba(148,163,184,.18);--mut:rgba(226,232,240,.78);--txt:#f8fafc;--acc:#fbbf24;--red:#dc2626;}
+  *{box-sizing:border-box;}
+  body{margin:0;padding:18px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0a1020;color:var(--txt);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .sheet{max-width:960px;margin:0 auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:linear-gradient(165deg,#111a30 0%,#0b1224 45%,#0a1628 100%);box-shadow:0 22px 60px rgba(0,0,0,.45);}
+  .hd{padding:16px 16px 12px;border-bottom:1px solid var(--line);background:rgba(15,23,42,.95);}
+  .brand{font-weight:1000;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-size:13px;}
+  .addr{margin-top:6px;color:rgba(226,232,240,.78);font-weight:700;font-size:12px;line-height:1.35;}
+  .title{margin-top:6px;font-size:18px;font-weight:1000;}
+  .sub{margin-top:8px;color:rgba(248,250,252,.92);font-weight:900;font-size:12px;line-height:1.45;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{position:sticky;top:0;background:#0f172a;color:rgba(226,232,240,.78);text-transform:uppercase;letter-spacing:.06em;font-size:10px;font-weight:1000;padding:10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:10px;border-bottom:1px solid rgba(148,163,184,.12);color:rgba(248,250,252,.92);font-weight:700;}
+  tbody tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+  .ft{padding:12px 16px;background:linear-gradient(90deg, rgba(185, 28, 28, 0.95), rgba(220, 38, 38, 0.88));font-weight:1000;}
+  @media print{body{padding:0;background:#0a1020}.sheet{box-shadow:none;border-radius:0;max-width:none} thead th{position:static}}
+</style>
+</head><body>
+  <div class="sheet">
+    <div class="hd">
+      <div class="brand">AZAN ONLINE EXPERTS</div>
+      <div class="addr">Shop No. 10, District Court, Saidu Sharif, Swat</div>
+      <div class="title">General Dues Detail</div>
+      <div class="sub">Description: <b>${escHtml(label)}</b></div>
+    </div>
+    <div style="padding:12px 12px 0">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Date</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="5">—</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div class="ft">TOTAL DUES: ${escHtml(formatRs(total))} (${sorted.length} entries)</div>
+  </div>
+</body></html>`
+
+  printFullDocument(doc)
+}
+
 function mergeEntriesById(updated: Entry[]) {
   const map = new Map(updated.map((e) => [e.id, e]))
   const all = loadEntries().map((e) => map.get(e.id) ?? e)
@@ -3126,9 +3929,33 @@ function mergeWeaponLinesById(updated: WeaponAllotLine[]) {
   saveWeaponAllotLines(all)
 }
 
+function applyCollectionToGeneral(entries: GeneralEntryLine[], amount: number): GeneralEntryLine[] {
+  let left = amount
+  const sorted = entries
+    .slice()
+    .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
+  return sorted.map((e) => {
+    const copy: GeneralEntryLine = { ...e }
+    if (left <= 0) return copy
+    const d = generalDuesRemaining(copy)
+    if (d <= 0) return copy
+    const pay = Math.min(d, left)
+    const base = copy.collected ?? 0
+    copy.collected = base + pay
+    left -= pay
+    return copy
+  })
+}
+
+function mergeGeneralEntriesById(updated: GeneralEntryLine[]) {
+  const map = new Map(updated.map((e) => [e.id, e]))
+  const all = loadGeneralEntries().map((e) => map.get(e.id) ?? e)
+  saveGeneralEntries(all)
+}
+
 type DuesPaymentLog = {
   id: string
-  kind: 'app' | 'weapon'
+  kind: 'app' | 'weapon' | 'general'
   groupKey: string
   amount: number
   paidAt: string
@@ -3158,6 +3985,7 @@ function allBackupStorageKeys(): string[] {
     ENTRY_STORAGE_KEY,
     WEAPON_ALLOT_KEY,
     EXPENSE_STORAGE_KEY,
+    GENERAL_ENTRY_KEY,
     DUES_PAYMENTS_KEY,
     RECYCLE_STORAGE_KEY,
     PIN_STORAGE_KEY,
@@ -3249,7 +4077,7 @@ function restoreFromBackupText(text: string): { ok: boolean; message: string } {
   }
 }
 
-function appendDuesPaymentLog(kind: 'app' | 'weapon', groupKey: string, amount: number) {
+function appendDuesPaymentLog(kind: 'app' | 'weapon' | 'general', groupKey: string, amount: number) {
   const all = loadDuesPaymentLogs()
   all.push({
     id: cryptoId(),
@@ -3267,7 +4095,7 @@ function formatPaidDateTime(iso: string) {
   return `${formatHeaderDate(d)} ${formatHeaderTime(d)}`
 }
 
-function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon', groupKey: string) {
+function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon' | 'general', groupKey: string) {
   if (!el) return
   const logs = loadDuesPaymentLogs()
     .filter((l) => l.kind === kind && l.groupKey === groupKey)
@@ -3297,7 +4125,7 @@ function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon', g
 }
 
 function openDuesDetailModal(opts: {
-  kind: 'app' | 'weapon'
+  kind: 'app' | 'weapon' | 'general'
   groupKey: string
   setModalOpen: (v: boolean) => void
   onSaved: () => void
@@ -3459,7 +4287,7 @@ function openDuesDetailModal(opts: {
     })
 
     closeBtn?.addEventListener('click', tearDown)
-  } else {
+  } else if (opts.kind === 'weapon') {
     let lines = loadWeaponDuesGroup(opts.groupKey)
     if (!lines.length) {
       tearDown()
@@ -3575,6 +4403,131 @@ function openDuesDetailModal(opts: {
     })
 
     closeBtn?.addEventListener('click', tearDown)
+  } else {
+    // General dues (manual)
+    const groupKey = opts.groupKey
+    const loadGroup = () =>
+      loadGeneralEntries()
+        .filter((r) => r.kind === 'dues' && r.description.trim().toLowerCase() === groupKey && generalDuesRemaining(r) > 0)
+        .slice()
+        .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
+    let lines = loadGroup()
+    if (!lines.length) {
+      tearDown()
+      return
+    }
+    const label = (lines[0]?.description || '').trim() || groupKey || '—'
+    const total = lines.reduce((s, r) => s + generalDuesRemaining(r), 0)
+
+    modal.innerHTML = `
+      <div class="dues-modal-hd">
+        <div class="dues-modal-hd-top">
+          <div class="dues-modal-hd-name">${esc(label)}</div>
+          <div class="dues-modal-hd-cnic">General</div>
+        </div>
+        <div class="dues-modal-hd-sub">
+          <span class="dues-modal-hd-kicker">${ICON_COIN}<span>Dues Detail</span></span>
+        </div>
+      </div>
+      <div class="dues-modal-meta">
+        <span>General dues · grouped by Description</span>
+      </div>
+      <div class="dues-modal-split">
+        <aside class="dues-modal-aside" aria-label="Payment history">
+          <div class="dues-modal-aside-title">Last payment</div>
+          <div class="dues-modal-payhist-body"></div>
+        </aside>
+        <div class="dues-modal-main">
+          <div class="dues-modal-section">${ICON_DOC}<span>All Due Entries (${lines.length}):</span></div>
+          <div class="dues-modal-tablewrap">
+            <table class="dues-modal-table">
+              <thead>
+                <tr>
+                  <th>Type</th><th>ID</th><th>Date</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody class="dues-modal-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="dues-modal-total">TOTAL DUES: ${formatRs(total)} (${lines.length} entries)</div>
+      <div class="dues-modal-actions">
+        <label class="dues-collect-lbl">Collect Amount (Rs.):</label>
+        <input type="text" class="in dues-collect-in" inputmode="decimal" />
+        <span class="dues-collect-max">Max: ${formatRs(total)}</span>
+        <button type="button" class="btn primary dues-collect-btn">✓ Collect Now</button>
+        <button type="button" class="btn primary tool-purple dues-print-btn">${ICON_RECEIPT}<span>Print detail</span></button>
+        <button type="button" class="btn ghost dues-close-btn">✕ Close</button>
+      </div>
+      <div class="dues-modal-msg" role="status"></div>
+    `
+
+    const tbody = modal.querySelector<HTMLTableSectionElement>('.dues-modal-tbody')
+    const collectIn = modal.querySelector<HTMLInputElement>('.dues-collect-in')
+    const collectBtn = modal.querySelector<HTMLButtonElement>('.dues-collect-btn')
+    const printBtn = modal.querySelector<HTMLButtonElement>('.dues-print-btn')
+    const closeBtn = modal.querySelector<HTMLButtonElement>('.dues-close-btn')
+    const totalEl = modal.querySelector<HTMLDivElement>('.dues-modal-total')
+    const msg = modal.querySelector<HTMLDivElement>('.dues-modal-msg')
+    const payHistBody = modal.querySelector<HTMLDivElement>('.dues-modal-payhist-body')
+    const maxEl = modal.querySelector<HTMLSpanElement>('.dues-collect-max')
+
+    const renderRows = () => {
+      lines = loadGroup()
+      const t = lines.reduce((s, r) => s + generalDuesRemaining(r), 0)
+      if (totalEl) totalEl.textContent = `TOTAL DUES: ${formatRs(t)} (${lines.length} entries)`
+      if (maxEl) maxEl.textContent = `Max: ${formatRs(t)}`
+      renderDuesPayHistBody(payHistBody, 'general', groupKey)
+      if (!tbody) return
+      tbody.innerHTML =
+        lines
+          .map((r, i) => {
+            const rem = generalDuesRemaining(r)
+            return `<tr>
+              <td class="dues-modal-type">${ICON_DOC}<span>General</span></td>
+              <td>${i + 1}</td>
+              <td>${esc(r.entryDate || '—')}</td>
+              <td style="text-align:right">${formatRs(r.amount)}</td>
+              <td style="text-align:right">${formatRs(rem)}</td>
+              <td>${rem > 0 ? '☐ Active' : '☑ Paid'}</td>
+            </tr>`
+          })
+          .join('')
+      if (collectIn) collectIn.value = ''
+      if (msg) msg.textContent = ''
+    }
+    renderRows()
+
+    printBtn?.addEventListener('click', () => {
+      lines = loadGroup()
+      printGeneralDuesDetail(lines)
+    })
+
+    collectBtn?.addEventListener('click', () => {
+      const amt = parseNumOrNull(collectIn?.value ?? '')
+      const curTotal = lines.reduce((s, r) => s + generalDuesRemaining(r), 0)
+      if (amt === null || amt <= 0) {
+        if (msg) msg.textContent = 'Enter a valid amount.'
+        return
+      }
+      if (amt > curTotal + 0.001) {
+        if (msg) msg.textContent = `Amount cannot exceed ${formatRs(curTotal)}.`
+        return
+      }
+      const updated = applyCollectionToGeneral(lines, amt)
+      mergeGeneralEntriesById(updated)
+      appendDuesPaymentLog('general', groupKey, amt)
+      if (msg) msg.textContent = 'Saved.'
+      opts.onSaved()
+      renderRows()
+      const newTotal = loadGroup().reduce((s, r) => s + generalDuesRemaining(r), 0)
+      if (newTotal <= 0) {
+        window.setTimeout(tearDown, 400)
+      }
+    })
+
+    closeBtn?.addEventListener('click', tearDown)
   }
 
   document.addEventListener('keydown', escKey, true)
@@ -3634,6 +4587,26 @@ function buildDuesRows(): DuesRow[] {
       totalDues,
     })
   }
+  const gLines = loadGeneralEntries().filter((r) => r.kind === 'dues' && generalDuesRemaining(r) > 0)
+  const gMap = new Map<string, GeneralEntryLine[]>()
+  for (const r of gLines) {
+    const k = r.description.trim().toLowerCase()
+    if (!gMap.has(k)) gMap.set(k, [])
+    gMap.get(k)!.push(r)
+  }
+  for (const [k, list] of gMap) {
+    const totalDues = list.reduce((s, x) => s + generalDuesRemaining(x), 0)
+    const label = list[0]?.description.trim() || k || '—'
+    rows.push({
+      kind: 'general',
+      groupKey: k,
+      count: list.length,
+      nameRef: label,
+      cnic: '—',
+      mobile: '—',
+      totalDues,
+    })
+  }
   rows.sort((a, b) => a.nameRef.localeCompare(b.nameRef))
   return rows
 }
@@ -3646,7 +4619,7 @@ function openStartupReminderOverlay(opts: {
   const overlay = makeEl('div', { className: 'startup-reminder-overlay' })
   const card = makeEl('div', { className: 'startup-reminder' })
   const head = makeEl('div', { className: 'startup-reminder-head' })
-  head.innerHTML = `<div class="startup-reminder-title">Daily reminder</div><div class="startup-reminder-sub">Pending dues (application vs weapon) · Urgent / Other · up to 7 days left</div>`
+  head.innerHTML = `<div class="startup-reminder-title">Daily reminder</div><div class="startup-reminder-sub">Pending dues (application / weapon / general) · Urgent / Other · up to 7 days left</div>`
 
   const split = makeEl('div', { className: 'startup-reminder-split' })
   const duesPane = makeEl('div', { className: 'startup-reminder-pane startup-reminder-dues' })
@@ -3663,13 +4636,18 @@ function openStartupReminderOverlay(opts: {
       : opts.duesRows
           .map((r) => {
             const isApp = r.kind === 'app'
-            const kindClass = isApp ? 'is-app' : 'is-weapon'
+            const isWeapon = r.kind === 'weapon'
+            const kindClass = isApp ? 'is-app' : isWeapon ? 'is-weapon' : 'is-general'
             const badge = isApp
               ? `${ICON_DOC}<span>Application (tracking)</span>`
-              : `${ICON_TAG}<span>Weapon no. allotment</span>`
+              : isWeapon
+                ? `${ICON_TAG}<span>Weapon no. allotment</span>`
+                : `${ICON_DOC}<span>General dues</span>`
             const meta = isApp
               ? `CNIC ${escHtml(r.cnic)} · ${r.count} entr${r.count === 1 ? 'y' : 'ies'}`
-              : `${r.count} entr${r.count === 1 ? 'y' : 'ies'} · weapon allotment (client / weapon no.)`
+              : isWeapon
+                ? `${r.count} entr${r.count === 1 ? 'y' : 'ies'} · weapon allotment (client / weapon no.)`
+                : `${r.count} entr${r.count === 1 ? 'y' : 'ies'} · general`
             return `<div class="startup-reminder-due-card ${kindClass}" role="listitem">
   <div class="due-card-head"><span class="due-card-badge">${badge}</span><span class="due-card-amt">${escHtml(formatRs(r.totalDues))}</span></div>
   <div class="due-card-name">${escHtml(r.nameRef)}</div>
@@ -3824,8 +4802,8 @@ function makeDuesScreen(opts: { onBack: () => void }) {
 
     const html = filtered
       .map((r) => {
-        const ico = r.kind === 'app' ? ICON_DUES_APP : ICON_DUES_WEAPON
-        const lbl = r.kind === 'app' ? 'App' : 'Weapon'
+        const ico = r.kind === 'app' ? ICON_DUES_APP : r.kind === 'weapon' ? ICON_DUES_WEAPON : ICON_DOC
+        const lbl = r.kind === 'app' ? 'App' : r.kind === 'weapon' ? 'Weapon' : 'General'
         const gk = encodeURIComponent(r.groupKey)
         return `<tr class="dues-row" tabindex="0" data-kind="${r.kind}" data-group-key="${gk}">
           <td class="dues-type-cell"><span class="dues-type-ico">${ico}</span><span class="dues-type-lbl">${lbl}(${r.count})</span></td>
@@ -3841,7 +4819,7 @@ function makeDuesScreen(opts: { onBack: () => void }) {
 
     tbody?.querySelectorAll<HTMLTableRowElement>('tr.dues-row').forEach((tr) => {
       tr.addEventListener('dblclick', () => {
-        const kind = tr.getAttribute('data-kind') as 'app' | 'weapon' | null
+        const kind = tr.getAttribute('data-kind') as 'app' | 'weapon' | 'general' | null
         const enc = tr.getAttribute('data-group-key')
         if (!kind || !enc) return
         const groupKey = decodeURIComponent(enc)
@@ -3884,7 +4862,9 @@ function makeDuesScreen(opts: { onBack: () => void }) {
   return wrap
 }
 
-function makeNewEntry(opts: { onBack: () => void; initial?: Entry | null }) {
+function makeNewEntry(
+  opts: { onBack: () => void; initial?: Entry | null; draft?: NewEntryInsertOpts['draft']; insertAfterId?: string | null },
+) {
   const initial = opts.initial ?? null
   const isEdit = Boolean(initial)
 
@@ -4032,6 +5012,28 @@ function makeNewEntry(opts: { onBack: () => void; initial?: Entry | null }) {
     otherDays.value = initial.otherReminderDays != null ? String(initial.otherReminderDays) : ''
   } else {
     entryDate.valueAsDate = new Date()
+    const d = opts.draft
+    if (d) {
+      if (typeof d.entryDate === 'string' && d.entryDate.trim()) entryDate.value = d.entryDate
+      if (typeof d.name === 'string') name.value = d.name
+      if (typeof d.fatherName === 'string') fatherName.value = d.fatherName
+      if (typeof d.cnic === 'string') cnic.value = formatCnicDigits(d.cnic)
+      if (typeof d.trackingId === 'string') trackingId.value = d.trackingId
+      if (typeof d.reference === 'string') reference.value = d.reference
+      if (typeof d.weaponNumber === 'string') weaponNumber.value = d.weaponNumber
+      if (typeof d.policeStation === 'string') policeStation.value = d.policeStation
+      if (typeof d.mobileNumber === 'string') mobileNumber.value = d.mobileNumber
+      if (typeof d.category === 'string') category.value = d.category
+      if (typeof d.costPrice === 'number') costPrice.value = String(d.costPrice)
+      if (typeof d.salePrice === 'number') salePrice.value = String(d.salePrice)
+      if (typeof d.cashReceived === 'number') cashReceived.value = String(d.cashReceived)
+      if (d.urgency) {
+        const ur = urgencyWrap.querySelector<HTMLInputElement>(`input[name="urg"][value="${d.urgency}"]`)
+        if (ur) ur.checked = true
+      }
+      if (typeof d.urgentDays === 'number') urgentDays.value = String(d.urgentDays)
+      if (typeof d.otherReminderDays === 'number') otherDays.value = String(d.otherReminderDays)
+    }
   }
   syncUrgencyFields()
   updateTotals()
@@ -4097,7 +5099,10 @@ function makeNewEntry(opts: { onBack: () => void; initial?: Entry | null }) {
       fees: null,
     }
     const all = loadEntries()
-    all.push(newEntry)
+    const afterId = opts.insertAfterId ?? null
+    const ix = afterId ? all.findIndex((x) => x.id === afterId) : -1
+    if (ix >= 0) all.splice(ix + 1, 0, newEntry)
+    else all.push(newEntry)
     saveEntries(all)
     msg.textContent = 'Saved.'
     form.reset()
@@ -4431,7 +5436,7 @@ function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void
   const main = makeEl('div', { className: 'search-main' })
   const hint = makeEl('p', {
     className: 'search-hint',
-    text: 'Search by: Name / NIC / Tracking ID / Mobile',
+    text: 'Search by: Name / NIC / Tracking ID / Mobile / Police Station',
   })
   const bar = makeEl('div', { className: 'search-bar-row' })
   const searchIn = makeEl('input', {
@@ -4440,7 +5445,9 @@ function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void
   }) as HTMLInputElement
   const go = makeEl('button', { className: 'btn primary search-go', attrs: { type: 'button' } }) as HTMLButtonElement
   go.innerHTML = `${ICON_SEARCH}<span>Search</span>`
-  bar.append(searchIn, go)
+  const goPolice = makeEl('button', { className: 'btn ghost search-go search-go-police', attrs: { type: 'button' } }) as HTMLButtonElement
+  goPolice.innerHTML = `${ICON_SEARCH}<span>Police Station</span>`
+  bar.append(searchIn, go, goPolice)
 
   const status = makeEl('div', { className: 'search-status' })
   const tableWrap = makeEl('div', { className: 'table search-table' })
@@ -4511,6 +5518,12 @@ function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void
     })
   }
 
+  const matchesPoliceStation = (e: Entry, q: string) => {
+    const t = q.trim().toLowerCase()
+    if (!t) return false
+    return (e.policeStation || '').toLowerCase().includes(t)
+  }
+
   const runSearch = () => {
     const q = searchIn.value
     const t = q.trim()
@@ -4535,6 +5548,169 @@ function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void
             </tr>`
           })
           .join('') || (t ? `<tr><td colspan="6" class="empty">No matches.</td></tr>` : `<tr><td colspan="6" class="empty">No search yet.</td></tr>`)
+    }
+    let cur = selectedId ? loadEntries().find((x) => x.id === selectedId) : null
+    if (selectedId && !cur) selectedId = null
+    cur = selectedId ? loadEntries().find((x) => x.id === selectedId) : null
+    renderDetail(cur ?? null)
+  }
+
+  const runPoliceSearch = () => {
+    const q = searchIn.value
+    const t = q.trim()
+    lastList = t ? loadEntries().filter((x) => matchesPoliceStation(x, q)).slice().reverse() : []
+    status.textContent = t
+      ? `Found: ${lastList.length} record(s) — Police Station`
+      : 'Enter police station name and press Police Station.'
+    status.classList.toggle('search-status-ok', Boolean(t && lastList.length))
+    const esc = escCell
+    if (tbody) {
+      tbody.innerHTML =
+        lastList
+          .map((e, i) => {
+            const sel = e.id === selectedId ? ' is-selected' : ''
+            return `<tr class="search-row${sel}" data-entry-id="${e.id}" tabindex="0">
+              <td>${i + 1}</td>
+              <td>${esc(e.entryDate || '—')}</td>
+              <td>${esc(e.name || '—')}</td>
+              <td>${esc(e.cnic || '—')}</td>
+              <td>${esc(e.trackingId || '—')}</td>
+              <td>${esc(e.mobileNumber || '—')}</td>
+            </tr>`
+          })
+          .join('') ||
+        (t ? `<tr><td colspan="6" class="empty">No matches.</td></tr>` : `<tr><td colspan="6" class="empty">No search yet.</td></tr>`)
+    }
+    let cur = selectedId ? loadEntries().find((x) => x.id === selectedId) : null
+    if (selectedId && !cur) selectedId = null
+    cur = selectedId ? loadEntries().find((x) => x.id === selectedId) : null
+    renderDetail(cur ?? null)
+  }
+
+  tbody?.addEventListener('click', (ev) => {
+    const tr = (ev.target as HTMLElement).closest<HTMLTableRowElement>('tr.search-row[data-entry-id]')
+    if (!tr) return
+    selectedId = tr.getAttribute('data-entry-id')
+    tbody?.querySelectorAll('tr.search-row').forEach((r) => r.classList.remove('is-selected'))
+    tr.classList.add('is-selected')
+    const e = lastList.find((x) => x.id === selectedId) ?? loadEntries().find((x) => x.id === selectedId)
+    renderDetail(e ?? null)
+  })
+
+  go.addEventListener('click', () => runSearch())
+  goPolice.addEventListener('click', () => runPoliceSearch())
+  searchIn.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') runSearch()
+  })
+
+  main.append(hint, bar, status, tableWrap)
+  split.append(main, detail)
+  wrap.append(head, split)
+  renderDetail(null)
+  return wrap
+}
+
+function makePoliceStationSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void }) {
+  const wrap = makeEl('section', { className: 'sub-screen search-screen' })
+  const head = makeEl('div', { className: 'sub-head' })
+  const back = makeEl('button', { className: 'mini back', attrs: { type: 'button' } }) as HTMLButtonElement
+  back.textContent = '← Main Screen (ESC)'
+  back.addEventListener('click', () => opts.onBack())
+  const title = makeEl('div', { className: 'sub-title', text: 'Search by Police Station' })
+  head.append(back, title)
+
+  const split = makeEl('div', { className: 'search-split' })
+  const main = makeEl('div', { className: 'search-main' })
+  const hint = makeEl('p', {
+    className: 'search-hint',
+    text: 'Type Police Station name and press Search (Completed records are excluded).',
+  })
+  const bar = makeEl('div', { className: 'search-bar-row' })
+  const searchIn = makeEl('input', {
+    className: 'in search-in',
+    attrs: { type: 'search', placeholder: 'Police station…', 'aria-label': 'Search by police station' },
+  }) as HTMLInputElement
+  const go = makeEl('button', { className: 'btn primary search-go', attrs: { type: 'button' } }) as HTMLButtonElement
+  go.innerHTML = `${ICON_SEARCH}<span>Search</span>`
+  bar.append(searchIn, go)
+
+  const status = makeEl('div', { className: 'search-status' })
+  const tableWrap = makeEl('div', { className: 'table search-table' })
+  tableWrap.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>#</th><th>Date</th><th>Name</th><th>Father</th><th>CNIC</th></tr>
+      </thead>
+      <tbody class="search-tbody"></tbody>
+    </table>`
+  const tbody = tableWrap.querySelector<HTMLTableSectionElement>('.search-tbody')
+
+  const detail = makeEl('aside', { className: 'search-detail' })
+  detail.innerHTML = `
+    <div class="search-detail-hd">Detail</div>
+    <div class="search-detail-body"></div>
+    <div class="search-detail-actions"></div>`
+  const detailBody = detail.querySelector<HTMLDivElement>('.search-detail-body')!
+  const detailActs = detail.querySelector<HTMLDivElement>('.search-detail-actions')!
+
+  let selectedId: string | null = null
+  let lastList: Entry[] = []
+
+  const escCell = (s: string) => s.replaceAll('<', '&lt;')
+
+  const renderDetail = (e: Entry | null) => {
+    if (!e) {
+      detailBody.innerHTML = `<p class="search-detail-empty">Select a row to see details.</p>`
+      detailActs.innerHTML = ''
+      return
+    }
+    const st = entryStatusLabel(e)
+    detailBody.innerHTML = `
+      <div class="search-dl"><span class="search-dk">Name</span><span class="search-dv">${escCell(e.name || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">Father</span><span class="search-dv">${escCell(e.fatherName || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">CNIC</span><span class="search-dv">${escCell(e.cnic || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">Tracking ID</span><span class="search-dv">${escCell(e.trackingId || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">Mobile</span><span class="search-dv">${escCell(e.mobileNumber || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">Police Station</span><span class="search-dv">${escCell(e.policeStation || '—')}</span></div>
+      <div class="search-dl"><span class="search-dk">Status</span><span class="search-dv"><span class="pill ${st.toLowerCase()}">${st}</span></span></div>
+      <div class="search-dl"><span class="search-dk">Date</span><span class="search-dv">${formatDateDisplay(e.entryDate)}</span></div>`
+    detailActs.innerHTML = `
+      <button type="button" class="btn primary sm sdet-edit">${ICON_DOC}<span>Edit</span></button>
+      <button type="button" class="btn ghost sm sdet-bill">Print bill</button>
+      <button type="button" class="btn ghost sm sdet-detail">Print detail</button>`
+    detailActs.querySelector('.sdet-edit')?.addEventListener('click', () => opts.onEdit(e))
+    detailActs.querySelector('.sdet-bill')?.addEventListener('click', () => printClientBill(e))
+    detailActs.querySelector('.sdet-detail')?.addEventListener('click', () => printClientDetail(e))
+  }
+
+  const matchesPolice = (e: Entry, q: string) => {
+    if (e.manuallyCompleted) return false
+    const t = q.trim().toLowerCase()
+    if (!t) return false
+    return (e.policeStation || '').toLowerCase().includes(t)
+  }
+
+  const runSearch = () => {
+    const q = searchIn.value
+    const t = q.trim()
+    lastList = t ? loadEntries().filter((x) => matchesPolice(x, q)).slice().reverse() : []
+    status.textContent = t ? `Found: ${lastList.length} record(s)` : 'Enter police station and press Search.'
+    status.classList.toggle('search-status-ok', Boolean(t && lastList.length))
+    const esc = escCell
+    if (tbody) {
+      tbody.innerHTML =
+        lastList
+          .map((e, i) => {
+            const sel = e.id === selectedId ? ' is-selected' : ''
+            return `<tr class="search-row${sel}" data-entry-id="${e.id}" tabindex="0">
+              <td>${i + 1}</td>
+              <td>${esc(e.entryDate || '—')}</td>
+              <td>${esc(e.name || '—')}</td>
+              <td>${esc(e.fatherName || '—')}</td>
+              <td>${esc(e.cnic || '—')}</td>
+            </tr>`
+          })
+          .join('') || (t ? `<tr><td colspan="5" class="empty">No matches.</td></tr>` : `<tr><td colspan="5" class="empty">No search yet.</td></tr>`)
     }
     let cur = selectedId ? loadEntries().find((x) => x.id === selectedId) : null
     if (selectedId && !cur) selectedId = null

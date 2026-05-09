@@ -1,23 +1,21 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ESYSOFT",
-  "version": "0.1.1",
+  "version": "1.2.0",
   "identifier": "com.esysoft.desktop",
   "build": {
-    "devUrl": "http://127.0.0.1:5173/",
-    "frontendDist": "../dist",
+    "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev:web",
-    "beforeBuildCommand": "npm run build"
+    "devUrl": "http://127.0.0.1:5173/",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "EsySoft - Application Tracking System",
+        "title": "EsySoft v1.2.0 – Application Tracking System",
         "width": 1100,
         "height": 720,
         "resizable": true,
-        "fullscreen": false,
-        "maximized": true
+        "fullscreen": false
       }
     ],
     "security": {
@@ -26,7 +24,6 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -34,17 +31,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
-    }
+    ]
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0MjQ5Rjc5MDNDM0M2MgpSV1JpUER5UTkwbENDQjdla3NVT3dvRVRUZWlja1RCWjJ1UFo4eEp3V0FwdTM1MHFQOUovLzdmRwo=",
+      "active": true,
       "endpoints": [
-        "https://github.com/OWNER/REPO/releases/latest/download/update.json"
-      ]
+        "https://raw.githubusercontent.com/mrirfanullah5/esysoft/main/update.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFQUYxRjFDNTJDOENEODIKUldTQ3pjaFNIQit2anJnb1BrRXlyZFdmRGszR0dnTGtLVE5GMWF1VmQ5MGtONlBWTHhldk91cTUK"
     }
   }
 }
