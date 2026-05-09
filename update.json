@@ -1,21 +1,11 @@
 {
-
   "version": "1.2.0",
-
-  "notes": "EsySoft Advance School Management System - Major Update v1.2.0",
-
+  "notes": "EsySoft - Performance improvements and bug fixes v1.2.0",
   "pub_date": "2026-05-09T16:30:00Z",
-
   "platforms": {
-
     "windows-x86_64": {
-
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaVBEeVE5MGxDQ0Vwbm96WXgvbkZLZWVjT3doS2hQV1hQWUQ4d2o1YVU2aUUxTURycEtYUWN3YkFjekxOM0xCNVZvUDMzSmdoQVM5bG0xZ1R6WHlPa0t1TlJSeDdBRHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MzI1Njk0CWZpbGU6RVNZU09GVF8xLjIuMF94NjQtc2V0dXAuZXhlCk1BR28vT2FEamR6dWtZTmVsM1lhT0huejdsVWdjWVA1K0Z5SmZvSU9QYUd6d0ZlZkxtYytCVTdwU3V0NE1yWlRsNEhJSEQyK01XVGQwRmduZURQVEJRPT0K",
-
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5RUttdDRwUVl3N2Q1YVpVVm9nV1FZQ2Jjb3J4MzFldFF4bG1HSFJ5Ly9XY0FBQkFBQUFBQUFBQUFBQUlBQUFBQVlFLzRJOHM2bVpUY2RZZkpiMjdyakxjUjYxWXV4UWJuaVVBbGs0bjBXeUREdi93YzI4SGxZZFIyb2lsa1ZQSnEwU0xDbG5Bb2EzOFJKK0NzMlkxbjJjZzFIa0U1eEFqUks2ZURiYjBTc004WktPYUVvVDI0UXVmTUZwWHR3TWVLZmVIbE85Yy9HbFE9Cg==",
       "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.2.0/ESYSOFT_1.2.0_x64-setup.exe"
-
     }
-
   }
-
 }
