@@ -1,0 +1,11 @@
+{
+  "version": "1.2.0",
+  "notes": "EsySoft v1.2.0 - New Professional Dashboard & Auto-Updater Enabled.",
+  "pub_date": "2026-05-09T11:35:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2amwxZkNaQjkvMmEvZnFDN1E3a0hyMVl3WlBYMW83VmZRZy93elR2N1IxRjNhOHg0VXZUYm5NMi9BZVM0Y0I4Ty8rSEFrdUdYZ2UzeGJFQmY0ZDRlMlFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MzUwOTI4CWZpbGU6RVNZU09GVF8xLjIuMF94NjQtc2V0dXAuZXhlClVlNkRnTkRMWUNXSHBaVUpBNkxGT2J4N2U3NGNxcW5BR2RySTV5T1diTzdhcFlMUWU5SFZCN2xCUWpWNFV1TWNtaTFFS29QakxIYXoxMGtXdGdYMUJRPT0K",
+      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.2.0/ESYSOFT_1.2.0_x64-setup.exe"
+    }
+  }
+}
