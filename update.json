@@ -1,11 +1,21 @@
 {
-    "version": "1.1",
-    "notes": "EsySoft School Management System - New Version 1.1",
-    "pub_date": "2026-05-08T10:15:00Z",
-    "platforms": {
-      "windows-x86_64": {
-        "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaVBEeVE5MGxDQ0lSeGRtRGJwSVJvaThZdEp4NEJ1OTBvdnBFNkluYWo2TUluVjRrSjBUeGVETU1oRFRkbzVZMFdhdW5NT2hoaGNLdEE5WUFOVGhOM1JkQ21pY1NPdndJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MTc5NTYxCWZpbGU6RVNZU09GVF8wLjEuMV94NjQtc2V0dXAuZXhlCnRsM0ZFNytTTEJ3SG94MTBxSGJ6a3p1eSt1RnBJNThlY2l2ODk3T2orNFZYMVJtTzJMdktIWUsxU1lsNjZRODR6YldTanY0SFRVcEZieW16Mm53ZkNnPT0K",
-        "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.1/ESYSOFT_0.1.1-x64-setup.exe"
-      }
+
+  "version": "1.2.0",
+
+  "notes": "EsySoft Advance School Management System - Major Update v1.2.0",
+
+  "pub_date": "2026-05-09T16:30:00Z",
+
+  "platforms": {
+
+    "windows-x86_64": {
+
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaVBEeVE5MGxDQ0Vwbm96WXgvbkZLZWVjT3doS2hQV1hQWUQ4d2o1YVU2aUUxTURycEtYUWN3YkFjekxOM0xCNVZvUDMzSmdoQVM5bG0xZ1R6WHlPa0t1TlJSeDdBRHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MzI1Njk0CWZpbGU6RVNZU09GVF8xLjIuMF94NjQtc2V0dXAuZXhlCk1BR28vT2FEamR6dWtZTmVsM1lhT0huejdsVWdjWVA1K0Z5SmZvSU9QYUd6d0ZlZkxtYytCVTdwU3V0NE1yWlRsNEhJSEQyK01XVGQwRmduZURQVEJRPT0K",
+
+      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.2.0/ESYSOFT_1.2.0_x64-setup.exe"
+
     }
+
   }
+
+}
