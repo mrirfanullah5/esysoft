@@ -1131,13 +1131,6 @@ html:has(#app > .shell.mode-home) body {
   color: rgba(255, 255, 255, 0.96);
 }
 
-.home-tiles-card .home-ver {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: rgba(253, 230, 138, 0.88);
-}
-
 .home-tiles-grid {
   flex: 0 0 auto;
   width: calc(5 * 2in + 4 * 12px); /* five 2 in × 2 in tiles + light gutters */
@@ -1165,7 +1158,7 @@ html:has(#app > .shell.mode-home) body {
   align-content: center;
   justify-items: center;
   text-align: center;
-  gap: 4px;
+  gap: 8px;
   box-sizing: border-box;
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -1192,27 +1185,45 @@ html:has(#app > .shell.mode-home) body {
 }
 
 .home-tiles-grid .tile .tile-ico {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 7px 14px rgba(0, 0, 0, 0.22);
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.98);
+  background: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 .home-tiles-grid .tile-ico .ico {
-  width: 16px;
-  height: 16px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  width: 30px;
+  height: 30px;
+  display: block;
+  shape-rendering: geometricPrecision;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
+}
+
+/* Outline (stroke) dashboard icons — avoid global .ico fill from flattening strokes */
+.home-tiles-grid .tile-ico .ico.dash-ico,
+.home-tiles-grid .tile-ico .ico.dash-ico * {
+  fill: none;
+  stroke: currentColor;
 }
 
 .home-tiles-grid .tile-label {
-  font-size: 9px;
+  font-size: 15px;
   font-weight: 900;
-  line-height: 1.15;
-  color: rgba(255, 255, 255, 0.96);
-  letter-spacing: 0.15px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  line-height: 1.22;
+  color: rgba(255, 255, 255, 0.98);
+  letter-spacing: 0.28px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   max-width: 100%;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -1261,8 +1272,8 @@ html:has(#app > .shell.mode-home) body {
 
 @media (max-width: 540px) {
   .home-tiles-grid .tile-label {
-    font-size: 8px;
-    line-height: 1.1;
+    font-size: 12px;
+    line-height: 1.16;
   }
 }
 
@@ -5229,14 +5240,14 @@ body.theme-light .stat-warn-caption {
   }
 
   .home-tiles-grid .tile-ico {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
   }
 
   .home-tiles-grid .tile-ico .ico {
-    width: 14px;
-    height: 14px;
+    width: 24px;
+    height: 24px;
   }
 
   .home-tiles-card {

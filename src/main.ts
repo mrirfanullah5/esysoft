@@ -3,7 +3,7 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.2.0'
+const ESYSOFT_APP_VERSION = '1.4.0'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
 
 const DEFAULT_PIN = '000000'
@@ -43,7 +43,12 @@ function applyTheme() {
 }
 
 function svgIcon(pathD: string) {
-  return `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${pathD}"/></svg>`
+  return `<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${pathD}"/></svg>`
+}
+
+/** Dashboard home tiles only — Lucide-style outline icons (stroke) for a cleaner look. */
+function dashOutlineIcon(children: string) {
+  return `<svg class="ico dash-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${children}</svg>`
 }
 
 function sleepMs(ms: number) {
@@ -136,9 +141,6 @@ const ICON_COIN = svgIcon(
 const ICON_RECEIPT = svgIcon(
   'M7 2h10a2 2 0 0 1 2 2v18l-2-1-2 1-2-1-2 1-2-1-2 1-2-1-2 1V4a2 2 0 0 1 2-2Zm2 6h6a1 1 0 1 0 0-2H9a1 1 0 1 0 0 2Zm0 4h6a1 1 0 1 0 0-2H9a1 1 0 1 0 0 2Zm0 4h4a1 1 0 1 0 0-2H9a1 1 0 1 0 0 2Z',
 )
-const ICON_TRASH = svgIcon(
-  'M9 3h6l1 2h4a1 1 0 1 1 0 2h-1l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4a1 1 0 1 1 0-2h4l1-2Zm-2 4 1 14h8l1-14H7Zm3 3a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0v-7a1 1 0 0 1 1-1Zm5 1v7a1 1 0 1 1-2 0v-7a1 1 0 1 1 2 0Z',
-)
 const ICON_CHART = svgIcon(
   'M5 21a1 1 0 0 1-1-1V4a1 1 0 1 1 2 0v15h15a1 1 0 1 1 0 2H5Zm3-3V11a1 1 0 0 1 2 0v7a1 1 0 1 1-2 0Zm4 0V8a1 1 0 0 1 2 0v10a1 1 0 1 1-2 0Zm4 0v-5a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0Z',
 )
@@ -148,9 +150,34 @@ const ICON_SEARCH = svgIcon(
 const ICON_EYE = svgIcon(
   'M12 5c-5.05 0-9.27 3.11-11 7 1.73 3.89 5.95 7 11 7s9.27-3.11 11-7c-1.73-3.89-5.95-7-11-7Zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9Zm0-2.2A2.3 2.3 0 1 0 12 9.7a2.3 2.3 0 0 0 0 4.6Z',
 )
-const ICON_GEAR = svgIcon(
-  'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm9 3.5a7.9 7.9 0 0 1-.12 1.36l2.02 1.57-2 3.46-2.44-.98a8.2 8.2 0 0 1-2.35 1.36l-.37 2.6H9.26l-.37-2.6a8.2 8.2 0 0 1-2.35-1.36l-2.44.98-2-3.46 2.02-1.57A7.9 7.9 0 0 1 3 12c0-.46.04-.92.12-1.36L1.1 9.07l2-3.46 2.44.98A8.2 8.2 0 0 1 7.89 5.23l.37-2.6h3.48l.37 2.6a8.2 8.2 0 0 1 2.35 1.36l2.44-.98 2 3.46-2.02 1.57c.08.44.12.9.12 1.36Z',
+
+const DASH_ICO_PLUS = dashOutlineIcon('<path d="M12 5v14"/><path d="M5 12h14"/>')
+const DASH_ICO_FILE = dashOutlineIcon(
+  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h5"/>',
 )
+const DASH_ICO_TAG = dashOutlineIcon(
+  '<path d="M3 12l9-9h7v7l-9 9-7-7Z"/><circle cx="16.5" cy="7.5" r="2" fill="none"/>',
+)
+const DASH_ICO_RECEIPT = dashOutlineIcon(
+  '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2"/><path d="M8 10h8"/><path d="M8 14h8"/><path d="M8 18h6"/>',
+)
+const DASH_ICO_COINS = dashOutlineIcon(
+  '<path d="M12 3c4.42 0 8 1.34 8 3s-3.58 3-8 3-8-1.34-8-3 3.58-3 8-3Z"/><path d="M4 6v5c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 11v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5"/>',
+)
+const DASH_ICO_SEARCH = dashOutlineIcon('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')
+const DASH_ICO_MAP_PIN = dashOutlineIcon(
+  '<path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z"/><circle cx="12" cy="11" r="2.5" fill="none"/>',
+)
+const DASH_ICO_TRASH = dashOutlineIcon(
+  '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+)
+const DASH_ICO_CHART = dashOutlineIcon(
+  '<path d="M3 3v18h18"/><path d="M7 16V10"/><path d="M12 16V7"/><path d="M17 16v-6"/>',
+)
+const DASH_ICO_SETTINGS = dashOutlineIcon(
+  '<circle cx="12" cy="12" r="3"/><path d="M12 1.5v2.2m0 16.6v2.2M4.9 4.9l1.6 1.6m11 11 1.6 1.6M1.5 12h2.2m16.6 0h2.2M4.9 19.1l1.6-1.6m11-11 1.6-1.6"/>',
+)
+
 /** Document / application row in Pending Dues */
 const ICON_DUES_APP = svgIcon('M7 3h7l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm6 1.5V8h3.5L13 4.5Z')
 /** Pistol / weapon row in Pending Dues */
@@ -483,7 +510,10 @@ function makeDeskTopbar(opts?: { onLogout?: () => void }) {
   const topbar = makeEl('header', { className: 'topbar topbar-dark' })
   topbar.innerHTML = `
     <div class="top-left">
-      <div class="brand-mini">ESYSoft</div>
+      <div class="brand-wrap">
+        <div class="brand-mini">ESYSoft</div>
+        <span class="brand-mini-ver">v${ESYSOFT_APP_VERSION}</span>
+      </div>
     </div>
     <div class="top-center">
       <div class="brand-center">AZAN Online Experts</div>
@@ -575,48 +605,47 @@ function makeHome(opts: { onLogout: () => void }) {
     <div class="home-tiles-card">
     <div class="home-title">
       <div class="home-kicker">Application Tracking Panel</div>
-      <div class="home-ver">${ESYSOFT_VERSION_LABEL}</div>
       <div class="home-name">EsySoft Dashboard</div>
     </div>
     <div class="home-tiles-grid" role="navigation" aria-label="Main dashboard actions">
       <button type="button" class="tile tone-dash-1" data-home-act="new-entry">
-        <div class="tile-ico">${ICON_PLUS}</div>
+        <div class="tile-ico">${DASH_ICO_PLUS}</div>
         <div class="tile-label">New Entry</div>
       </button>
       <button type="button" class="tile tone-dash-2" data-home-act="general">
-        <div class="tile-ico">${ICON_DOC}</div>
+        <div class="tile-ico">${DASH_ICO_FILE}</div>
         <div class="tile-label">Genral Entry</div>
       </button>
       <button type="button" class="tile tone-dash-3" data-home-act="weapon">
-        <div class="tile-ico">${ICON_TAG}</div>
+        <div class="tile-ico">${DASH_ICO_TAG}</div>
         <div class="tile-label">Wepon Number Alot</div>
       </button>
       <button type="button" class="tile tone-dash-4" data-home-act="expense">
-        <div class="tile-ico">${ICON_RECEIPT}</div>
+        <div class="tile-ico">${DASH_ICO_RECEIPT}</div>
         <div class="tile-label">Expence</div>
       </button>
       <button type="button" class="tile tone-dash-5" data-home-act="dues">
-        <div class="tile-ico">${ICON_COIN}</div>
+        <div class="tile-ico">${DASH_ICO_COINS}</div>
         <div class="tile-label">Dues</div>
       </button>
       <button type="button" class="tile tone-dash-6" data-home-act="search">
-        <div class="tile-ico">${ICON_SEARCH}</div>
+        <div class="tile-ico">${DASH_ICO_SEARCH}</div>
         <div class="tile-label">Serch</div>
       </button>
       <button type="button" class="tile tone-dash-7" data-home-act="search-police">
-        <div class="tile-ico">${ICON_SEARCH}</div>
+        <div class="tile-ico">${DASH_ICO_MAP_PIN}</div>
         <div class="tile-label">Search by Police Station</div>
       </button>
       <button type="button" class="tile tone-dash-8" data-home-act="recycle">
-        <div class="tile-ico">${ICON_TRASH}</div>
+        <div class="tile-ico">${DASH_ICO_TRASH}</div>
         <div class="tile-label">Recyle Bin</div>
       </button>
       <button type="button" class="tile tone-dash-9" data-home-act="report">
-        <div class="tile-ico">${ICON_CHART}</div>
+        <div class="tile-ico">${DASH_ICO_CHART}</div>
         <div class="tile-label">Reports</div>
       </button>
       <button type="button" class="tile tone-dash-10" data-home-act="settings">
-        <div class="tile-ico">${ICON_GEAR}</div>
+        <div class="tile-ico">${DASH_ICO_SETTINGS}</div>
         <div class="tile-label">Settings</div>
       </button>
     </div>
