@@ -55,6 +55,34 @@ function sleepMs(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
 
+let didRunAutoUpdateCheck = false
+
+/** Once at startup (login screen): fetch `update.json` from tauri.conf endpoints; offer install. */
+async function maybeCheckAppUpdates(): Promise<void> {
+  if (didRunAutoUpdateCheck) return
+  didRunAutoUpdateCheck = true
+  try {
+    const { check } = await import('@tauri-apps/plugin-updater')
+    const { relaunch } = await import('@tauri-apps/plugin-process')
+    const update = await check({ timeout: 45_000 })
+    if (!update) return
+    const notes = (update.body ?? '').trim()
+    const ok = await confirmModal({
+      title: `Update available — v${update.version}`,
+      message: notes
+        ? `${notes}\n\nInstall now? The app will download the update and restart.`
+        : `A new version is ready.\n\nInstall now? The app will download the update and restart.`,
+      confirmText: 'Install update',
+      cancelText: 'Not now',
+    })
+    if (!ok) return
+    await update.downloadAndInstall()
+    await relaunch()
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('[updater] check failed:', e)
+  }
+}
+
 type ConfirmVariant = 'default' | 'danger'
 
 async function confirmModal(opts: {
@@ -264,6 +292,7 @@ function render() {
   if (!root) throw new Error('Missing #app')
   root.replaceChildren(makeAppShell())
   void applyMainWindowMaximized()
+  queueMicrotask(() => void maybeCheckAppUpdates())
 }
 
 function makeAppShell() {
