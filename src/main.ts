@@ -3,7 +3,7 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.4.0'
+const ESYSOFT_APP_VERSION = '1.4.1'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
 
 const DEFAULT_PIN = '000000'
@@ -154,6 +154,9 @@ async function confirmModal(opts: {
 
 const ICON_LOCK = svgIcon(
   'M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm-3 8V7a3 3 0 1 1 6 0v3H9Z',
+)
+const ICON_LOGOUT = svgIcon(
+  'M4 3a1 1 0 0 1 1-1h8a2 2 0 0 1 2 2v3a1 1 0 1 1-2 0V4H6v16h7v-3a1 1 0 1 1 2 0v3a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1V3Zm12.7 5.3a1 1 0 0 1 1.4 0l3 3a1 1 0 0 1 0 1.4l-3 3a1 1 0 1 1-1.4-1.4l1.3-1.3H10a1 1 0 1 1 0-2h8l-1.3-1.3a1 1 0 0 1 0-1.4Z',
 )
 const ICON_SHIELD = svgIcon(
   'M12 2 20 6v6c0 5.25-3.44 9.86-8 10-4.56-.14-8-4.75-8-10V6l8-4Zm0 5.2-4 2v4.65c0 3.5 2.2 6.7 4 6.9 1.8-.2 4-3.4 4-6.9V9.2l-4-2Z',
@@ -551,7 +554,7 @@ function makeDeskTopbar(opts?: { onLogout?: () => void }) {
     <div class="top-right">
       <div class="top-actions">
         <div class="dt"><span class="dt-date"></span><span class="dt-sep">•</span><span class="dt-time"></span></div>
-        ${opts?.onLogout ? `<button type="button" class="top-logout" aria-label="Log out">${ICON_LOCK}</button>` : ``}
+        ${opts?.onLogout ? `<button type="button" class="top-logout" aria-label="Log out">${ICON_LOGOUT}</button>` : ``}
       </div>
     </div>
   `
@@ -1248,11 +1251,7 @@ function makeHome(opts: { onLogout: () => void }) {
   })
 
   const dashMain = makeEl('div', { className: 'dash-main' })
-  const dashActions = makeEl('div', { className: 'dash-actions' })
-  const dashNewBtn = makeEl('button', { className: 'btn primary dash-new', attrs: { type: 'button' } }) as HTMLButtonElement
-  dashNewBtn.innerHTML = `${ICON_PLUS}<span>New Entry</span>`
-  dashActions.append(dashNewBtn)
-  dashMain.append(toolbar, tableScroll, dashActions)
+  dashMain.append(toolbar, tableScroll)
   dashView.append(dashMain)
   main.append(welcomeView, dashView, entryView, homeMenuView)
   content.append(sidebar.el, main)
@@ -1295,8 +1294,6 @@ function makeHome(opts: { onLogout: () => void }) {
     entryView.classList.remove('is-hidden')
     entryView.replaceChildren(makeNewEntry({ onBack: showHomeMenu }))
   }
-  dashNewBtn.addEventListener('click', () => showEntry())
-
   const showWeaponAllot = () => {
     sidebar.setActive('weapon')
     welcomeView.classList.add('is-hidden')
