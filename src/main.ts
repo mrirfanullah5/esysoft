@@ -3,7 +3,7 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.4.1'
+const ESYSOFT_APP_VERSION = '1.4.2'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
 
 const DEFAULT_PIN = '000000'
@@ -3263,6 +3263,7 @@ type GeneralEntryKind = 'dues' | 'expense' | 'other'
 type GeneralEntryLine = {
   id: string
   entryDate: string
+  name: string
   description: string
   amount: number
   kind: GeneralEntryKind
@@ -3283,9 +3284,12 @@ function loadGeneralEntries(): GeneralEntryLine[] {
     for (const item of parsed) {
       if (!item || typeof item !== 'object') continue
       const r = item as Partial<GeneralEntryLine>
-      const description = typeof r.description === 'string' ? r.description : ''
+      const rawName = typeof r.name === 'string' ? r.name : ''
+      const rawDescription = typeof r.description === 'string' ? r.description : ''
+      const name = rawName.trim() || rawDescription.trim()
+      const description = rawDescription.trim() || name
       const amount = typeof r.amount === 'number' ? r.amount : NaN
-      if (!description.trim() || !Number.isFinite(amount)) continue
+      if (!name || !Number.isFinite(amount)) continue
       const entryDate = typeof r.entryDate === 'string' && r.entryDate ? r.entryDate : isoToday()
       const id = typeof r.id === 'string' && r.id.length > 0 ? r.id : null
       const kind: GeneralEntryKind = r.kind === 'dues' || r.kind === 'expense' || r.kind === 'other' ? r.kind : 'other'
@@ -3296,9 +3300,10 @@ function loadGeneralEntries(): GeneralEntryLine[] {
       }
       if (!id) {
         needPersist = true
-        out.push({ id: cryptoId(), entryDate, description, amount, kind, collected })
+        out.push({ id: cryptoId(), entryDate, name, description, amount, kind, collected })
       } else {
-        out.push({ id, entryDate, description, amount, kind, collected })
+        if (!rawName.trim()) needPersist = true
+        out.push({ id, entryDate, name, description, amount, kind, collected })
       }
     }
     if (needPersist) saveGeneralEntries(out)
@@ -3316,6 +3321,14 @@ function generalDuesRemaining(r: GeneralEntryLine): number {
   if (r.kind !== 'dues') return 0
   const c = r.collected ?? 0
   return Math.max(0, r.amount - c)
+}
+
+function generalEntryDisplayName(r: GeneralEntryLine): string {
+  return (r.name || '').trim() || r.description.trim() || '—'
+}
+
+function generalEntryGroupKey(r: GeneralEntryLine): string {
+  return generalEntryDisplayName(r).toLowerCase()
 }
 
 function loadExpenses(): ExpenseLine[] {
@@ -3562,7 +3575,8 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
 
   const entryDate = input('Date', { type: 'date' })
   entryDate.value = isoToday()
-  const description = input('Description (e.g. Imran ko 500 diye)', { maxlength: '120' })
+  const name = input('Name', { maxlength: '80' })
+  const description = input('Details (e.g. Imran ko 500 diye)', { maxlength: '140' })
   const amount = input('Amount', { inputmode: 'decimal' })
   const kind = makeEl('select', { className: 'in', attrs: { 'aria-label': 'Type' } }) as HTMLSelectElement
   kind.innerHTML = `
@@ -3587,6 +3601,7 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
     kicker.textContent = 'New general entry'
     saveBtn.textContent = 'Save'
     entryDate.value = isoToday()
+    name.value = ''
     description.value = ''
     amount.value = ''
     kind.value = 'dues'
@@ -3597,7 +3612,13 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
   })
 
   const row = makeEl('div', { className: 'allot-fields allot-fields-general' })
-  row.append(mkField('Date', entryDate), mkField('Description', description), mkField('Amount', amount), mkField('Type', kind))
+  row.append(
+    mkField('Date', entryDate),
+    mkField('Name', name),
+    mkField('Details', description),
+    mkField('Amount', amount),
+    mkField('Type', kind),
+  )
   card.append(kicker, row, msg, actions)
   form.append(card)
 
@@ -3611,7 +3632,7 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
     <table>
       <thead>
         <tr>
-          <th>Date</th><th>Description</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Action</th>
+          <th>Name</th><th>Entries</th><th>Latest Date</th><th style="text-align:right">Total Amount</th><th style="text-align:right">Remaining</th><th>Action</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -3620,24 +3641,191 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
   const tbody = table.querySelector<HTMLTableSectionElement>('tbody')
   tableScroll.append(table)
 
-  const renderRows = () => {
-    const rows = loadGeneralEntries().slice().reverse()
-    const esc = (s: string) => s.replaceAll('<', '&lt;')
-    if (!tbody) return
-    tbody.innerHTML =
-      rows
+  const rowsForNameKey = (nameKey: string) =>
+    loadGeneralEntries().filter((r) => generalEntryGroupKey(r) === nameKey)
+
+  const startEdit = (cur: GeneralEntryLine) => {
+    editingId = cur.id
+    kicker.textContent = 'Edit general entry'
+    saveBtn.textContent = 'Save changes'
+    entryDate.value = cur.entryDate || isoToday()
+    name.value = generalEntryDisplayName(cur)
+    description.value = cur.description
+    amount.value = String(cur.amount)
+    kind.value = cur.kind
+    msg.textContent = ''
+  }
+
+  const deleteRowById = async (id: string) => {
+    const all = loadGeneralEntries()
+    const cur = all.find((x) => x.id === id)
+    if (!cur) return false
+    if (
+      !(await confirmModal({
+        title: 'Delete general entry',
+        message: `Delete this record?\n${generalEntryDisplayName(cur)} · ${formatDateDisplay(cur.entryDate)}`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        variant: 'danger',
+      }))
+    )
+      return false
+    saveGeneralEntries(all.filter((x) => x.id !== id))
+    if (editingId === id) clearEditing()
+    msg.textContent = 'Deleted.'
+    renderRows()
+    return true
+  }
+
+  const openGeneralNameDetailModal = (nameKey: string) => {
+    if (document.querySelector('.general-name-detail-overlay')) return
+    const current = rowsForNameKey(nameKey)
+    if (!current.length) return
+
+    const overlay = makeEl('div', { className: 'entry-detail-overlay general-name-detail-overlay' })
+    const box = makeEl('div', {
+      className: 'entry-detail-box weapon-allot-detail-box general-name-detail-box',
+    })
+    overlay.append(box)
+    document.body.append(overlay)
+
+    const label = generalEntryDisplayName(current[0])
+    let sumEl: HTMLParagraphElement | null = null
+
+    const tearDown = () => {
+      document.removeEventListener('keydown', onEsc, true)
+      if (overlay.isConnected) overlay.remove()
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      tearDown()
+    }
+
+    const updateTotals = (rows: GeneralEntryLine[]) => {
+      const total = rows.reduce((s, r) => s + r.amount, 0)
+      const remaining = rows.reduce((s, r) => s + generalDuesRemaining(r), 0)
+      const duesCount = rows.filter((r) => r.kind === 'dues').length
+      if (sumEl) {
+        sumEl.innerHTML = `
+          <span class="wad-stat"><b>${escHtml(String(rows.length))}</b> entries</span>
+          <span class="wad-stat">Dues lines <b>${escHtml(String(duesCount))}</b></span>
+          <span class="wad-stat">Total <b>${escHtml(formatRs(total))}</b></span>
+          <span class="wad-stat">Remaining <b>${escHtml(formatRs(remaining))}</b></span>
+        `
+      }
+    }
+
+    const refillBodyRows = (): boolean => {
+      const rows = rowsForNameKey(nameKey).sort((a, b) => {
+        const d = (b.entryDate || '').localeCompare(a.entryDate || '')
+        if (d !== 0) return d
+        return a.id.localeCompare(b.id)
+      })
+      if (!rows.length) return false
+      updateTotals(rows)
+      const tbodyHost = box.querySelector<HTMLTableSectionElement>('.general-name-detail-tbody')
+      if (!tbodyHost) return false
+      tbodyHost.innerHTML = rows
         .map((r) => {
           const rem = r.kind === 'dues' ? generalDuesRemaining(r) : 0
-          const remCell = r.kind === 'dues' ? formatRs(rem) : '—'
-          return `<tr data-id="${escAttr(r.id)}">
-            <td>${esc(formatDateDisplay(r.entryDate))}</td>
-            <td>${esc(r.description)}</td>
-            <td>${esc(r.kind)}</td>
+          return `<tr data-general-id="${escAttr(r.id)}">
+            <td>${escHtml(formatDateDisplay(r.entryDate))}</td>
+            <td>${escHtml(r.description.trim() || generalEntryDisplayName(r))}</td>
+            <td>${escHtml(r.kind)}</td>
             <td style="text-align:right">${formatRs(r.amount)}</td>
-            <td style="text-align:right">${remCell}</td>
+            <td style="text-align:right">${r.kind === 'dues' ? formatRs(rem) : '—'}</td>
+            <td class="weapon-group-modal-actions-cell">
+              <button type="button" class="mini general-detail-edit-row" data-general-detail-id="${escAttr(r.id)}">Edit</button>
+              <button type="button" class="mini mini-danger general-detail-delete-row" data-general-detail-id="${escAttr(r.id)}">Delete</button>
+            </td>
+          </tr>`
+        })
+        .join('')
+      return true
+    }
+
+    sumEl = makeEl('p', { className: 'weapon-group-sum-line weapon-allot-detail-sums general-name-detail-sums' })
+    box.innerHTML = `
+      <div class="entry-detail-hd weapon-detail-hd">
+        <div class="entry-detail-title weapon-detail-title">${escHtml(label)}</div>
+        <button type="button" class="mini entry-detail-x general-detail-close">✕</button>
+      </div>
+      <div class="entry-detail-body">
+        <div class="general-name-sum-mount"></div>
+        <div class="weapon-allot-detail-table-wrap">
+          <table class="entry-detail-table weapon-allot-detail-table general-name-detail-table">
+            <thead><tr><th>Date</th><th>Details</th><th>Type</th><th>Amount</th><th>Remaining</th><th>Action</th></tr></thead>
+            <tbody class="general-name-detail-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    `
+    box.querySelector('.general-name-sum-mount')?.replaceWith(sumEl)
+    refillBodyRows()
+
+    document.addEventListener('keydown', onEsc, true)
+    box.querySelector('.entry-detail-x')?.addEventListener('click', tearDown)
+    overlay.addEventListener('click', async (e: MouseEvent) => {
+      if (e.target === overlay) {
+        tearDown()
+        return
+      }
+      const targ = e.target as HTMLElement | null
+      if (!targ?.closest('.entry-detail-box')) return
+
+      const ed = targ.closest('button.general-detail-edit-row')
+      if (ed instanceof HTMLButtonElement) {
+        const id = ed.getAttribute('data-general-detail-id')
+        if (!id) return
+        const line = loadGeneralEntries().find((x) => x.id === id)
+        if (!line) return
+        tearDown()
+        startEdit(line)
+        return
+      }
+      const delBtn = targ.closest('button.general-detail-delete-row')
+      if (delBtn instanceof HTMLButtonElement) {
+        const id = delBtn.getAttribute('data-general-detail-id')
+        if (!id) return
+        const deleted = await deleteRowById(id)
+        if (!deleted) return
+        if (!rowsForNameKey(nameKey).length) tearDown()
+        else refillBodyRows()
+      }
+    })
+  }
+
+  const renderRows = () => {
+    const rows = loadGeneralEntries()
+    if (!tbody) return
+    const groups = new Map<string, GeneralEntryLine[]>()
+    for (const r of rows) {
+      const key = generalEntryGroupKey(r)
+      const list = groups.get(key) ?? []
+      list.push(r)
+      groups.set(key, list)
+    }
+    const ordered = [...groups.entries()].sort((a, b) => {
+      const latestA = a[1].reduce((m, r) => (r.entryDate > m ? r.entryDate : m), '')
+      const latestB = b[1].reduce((m, r) => (r.entryDate > m ? r.entryDate : m), '')
+      return latestB.localeCompare(latestA) || generalEntryDisplayName(a[1][0]).localeCompare(generalEntryDisplayName(b[1][0]), undefined, { sensitivity: 'base' })
+    })
+    tbody.innerHTML =
+      ordered
+        .map(([key, list]) => {
+          const latest = list.reduce((m, r) => (r.entryDate > m ? r.entryDate : m), '')
+          const total = list.reduce((s, r) => s + r.amount, 0)
+          const remaining = list.reduce((s, r) => s + generalDuesRemaining(r), 0)
+          const count = list.length
+          return `<tr class="general-name-row" tabindex="0" data-name-key="${escAttr(encodeURIComponent(key))}" title="Double-click for detail">
+            <td>${escHtml(generalEntryDisplayName(list[0]))}</td>
+            <td>${count} ${count === 1 ? 'entry' : 'entries'}</td>
+            <td>${escHtml(formatDateDisplay(latest))}</td>
+            <td style="text-align:right">${formatRs(total)}</td>
+            <td style="text-align:right">${remaining > 0 ? formatRs(remaining) : '—'}</td>
             <td class="td-actions">
-              <button type="button" class="btn ghost sm" data-act="edit">Edit</button>
-              <button type="button" class="btn danger sm" data-act="delete">Delete</button>
+              <button type="button" class="btn primary sm btn-eye general-name-detail-btn" data-name-key="${escAttr(encodeURIComponent(key))}" data-act="detail" aria-label="Show detail" title="Show detail">${ICON_EYE}</button>
             </td>
           </tr>`
         })
@@ -3647,50 +3835,42 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
   table.addEventListener('click', async (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]')
     if (!b) return
-    const tr = b.closest('tr[data-id]')
-    const id = tr?.getAttribute('data-id')
-    if (!id) return
     const act = b.getAttribute('data-act')
     if (!act) return
-    const all = loadGeneralEntries()
-    const cur = all.find((x) => x.id === id)
-    if (!cur) return
-    if (act === 'edit') {
-      editingId = id
-      kicker.textContent = 'Edit general entry'
-      saveBtn.textContent = 'Save changes'
-      entryDate.value = cur.entryDate || isoToday()
-      description.value = cur.description
-      amount.value = String(cur.amount)
-      kind.value = cur.kind
-      msg.textContent = ''
-      return
+    if (act === 'detail') {
+      const enc = b.getAttribute('data-name-key')
+      if (!enc) return
+      let key = enc
+      try {
+        key = decodeURIComponent(enc)
+      } catch {
+        key = enc
+      }
+      openGeneralNameDetailModal(key)
     }
-    if (act === 'delete') {
-      if (
-        !(await confirmModal({
-          title: 'Delete general entry',
-          message: 'Delete this record?',
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
-          variant: 'danger',
-        }))
-      )
-        return
-      const next = all.filter((x) => x.id !== id)
-      saveGeneralEntries(next)
-      msg.textContent = 'Deleted.'
-      renderRows()
+  })
+
+  table.addEventListener('dblclick', (ev) => {
+    const tr = (ev.target as HTMLElement).closest<HTMLTableRowElement>('tr[data-name-key]')
+    const enc = tr?.getAttribute('data-name-key')
+    if (!enc) return
+    let key = enc
+    try {
+      key = decodeURIComponent(enc)
+    } catch {
+      key = enc
     }
+    openGeneralNameDetailModal(key)
   })
 
   form.addEventListener('submit', (e) => {
     e.preventDefault()
-    const desc = description.value.trim()
+    const entryName = name.value.trim()
+    const desc = description.value.trim() || entryName
     const am = parseNumOrNull(amount.value)
     const k = (kind.value as GeneralEntryKind) || 'other'
-    if (!desc) {
-      msg.textContent = 'Description required.'
+    if (!entryName) {
+      msg.textContent = 'Name required.'
       return
     }
     if (am === null || am <= 0) {
@@ -3709,7 +3889,7 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
       const prev = all[ix]
       const prevCollected = prev.kind === 'dues' ? prev.collected ?? 0 : 0
       const nextCollected = k === 'dues' ? Math.max(0, Math.min(am, prevCollected)) : undefined
-      all[ix] = { ...prev, entryDate: entryDate.value || isoToday(), description: desc, amount: am, kind: k, collected: nextCollected }
+      all[ix] = { ...prev, entryDate: entryDate.value || isoToday(), name: entryName, description: desc, amount: am, kind: k, collected: nextCollected }
       saveGeneralEntries(all)
       msg.textContent = 'Updated.'
       clearEditing()
@@ -3719,6 +3899,7 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
     const row: GeneralEntryLine = {
       id: cryptoId(),
       entryDate: entryDate.value || isoToday(),
+      name: entryName,
       description: desc,
       amount: am,
       kind: k,
@@ -3898,7 +4079,7 @@ function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
   const sorted = usable
     .slice()
     .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
-  const label = (sorted[0]?.description || '').trim() || 'General'
+  const label = sorted[0] ? generalEntryDisplayName(sorted[0]) : 'General'
   const total = sorted.reduce((s, r) => s + generalDuesRemaining(r), 0)
 
   const rows = sorted
@@ -3907,6 +4088,7 @@ function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
       return `<tr>
         <td>${i + 1}</td>
         <td>${escHtml(r.entryDate || '—')}</td>
+        <td>${escHtml(r.description.trim() || generalEntryDisplayName(r))}</td>
         <td style="text-align:right">${escHtml(formatRs(r.amount))}</td>
         <td style="text-align:right">${escHtml(formatRs(rem))}</td>
         <td>${rem > 0 ? '☐ Active' : '☑ Paid'}</td>
@@ -3939,14 +4121,14 @@ function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
       <div class="brand">AZAN ONLINE EXPERTS</div>
       <div class="addr">Shop No. 10, District Court, Saidu Sharif, Swat</div>
       <div class="title">General Dues Detail</div>
-      <div class="sub">Description: <b>${escHtml(label)}</b></div>
+      <div class="sub">Name: <b>${escHtml(label)}</b></div>
     </div>
     <div style="padding:12px 12px 0">
       <table>
         <thead><tr>
-          <th>#</th><th>Date</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
+          <th>#</th><th>Date</th><th>Details</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
         </tr></thead>
-        <tbody>${rows || `<tr><td colspan="5">—</td></tr>`}</tbody>
+        <tbody>${rows || `<tr><td colspan="6">—</td></tr>`}</tbody>
       </table>
     </div>
     <div class="ft">TOTAL DUES: ${escHtml(formatRs(total))} (${sorted.length} entries)</div>
@@ -4463,7 +4645,7 @@ function openDuesDetailModal(opts: {
     const groupKey = opts.groupKey
     const loadGroup = () =>
       loadGeneralEntries()
-        .filter((r) => r.kind === 'dues' && r.description.trim().toLowerCase() === groupKey && generalDuesRemaining(r) > 0)
+        .filter((r) => r.kind === 'dues' && generalEntryGroupKey(r) === groupKey && generalDuesRemaining(r) > 0)
         .slice()
         .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
     let lines = loadGroup()
@@ -4471,7 +4653,7 @@ function openDuesDetailModal(opts: {
       tearDown()
       return
     }
-    const label = (lines[0]?.description || '').trim() || groupKey || '—'
+    const label = lines[0] ? generalEntryDisplayName(lines[0]) : groupKey || '—'
     const total = lines.reduce((s, r) => s + generalDuesRemaining(r), 0)
 
     modal.innerHTML = `
@@ -4485,7 +4667,7 @@ function openDuesDetailModal(opts: {
         </div>
       </div>
       <div class="dues-modal-meta">
-        <span>General dues · grouped by Description</span>
+        <span>General dues · grouped by Name</span>
       </div>
       <div class="dues-modal-split">
         <aside class="dues-modal-aside" aria-label="Payment history">
@@ -4498,7 +4680,7 @@ function openDuesDetailModal(opts: {
             <table class="dues-modal-table">
               <thead>
                 <tr>
-                  <th>Type</th><th>ID</th><th>Date</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
+                  <th>Type</th><th>ID</th><th>Date</th><th>Details</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
                 </tr>
               </thead>
               <tbody class="dues-modal-tbody"></tbody>
@@ -4543,6 +4725,7 @@ function openDuesDetailModal(opts: {
               <td class="dues-modal-type">${ICON_DOC}<span>General</span></td>
               <td>${i + 1}</td>
               <td>${esc(r.entryDate || '—')}</td>
+              <td>${esc(r.description.trim() || generalEntryDisplayName(r))}</td>
               <td style="text-align:right">${formatRs(r.amount)}</td>
               <td style="text-align:right">${formatRs(rem)}</td>
               <td>${rem > 0 ? '☐ Active' : '☑ Paid'}</td>
@@ -4645,13 +4828,13 @@ function buildDuesRows(): DuesRow[] {
   const gLines = loadGeneralEntries().filter((r) => r.kind === 'dues' && generalDuesRemaining(r) > 0)
   const gMap = new Map<string, GeneralEntryLine[]>()
   for (const r of gLines) {
-    const k = r.description.trim().toLowerCase()
+    const k = generalEntryGroupKey(r)
     if (!gMap.has(k)) gMap.set(k, [])
     gMap.get(k)!.push(r)
   }
   for (const [k, list] of gMap) {
     const totalDues = list.reduce((s, x) => s + generalDuesRemaining(x), 0)
-    const label = list[0]?.description.trim() || k || '—'
+    const label = list[0] ? generalEntryDisplayName(list[0]) : k || '—'
     rows.push({
       kind: 'general',
       groupKey: k,

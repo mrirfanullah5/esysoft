@@ -1,6 +1,6 @@
 {
   "productName": "ESYSOFT",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "identifier": "com.esysoft.desktop",
   "build": {
     "beforeBuildCommand": "npm run build",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "EsySoft v1.4.1 – Application Tracking System",
+        "title": "EsySoft v1.4.2 – Application Tracking System",
         "width": 1100,
         "height": 720,
         "resizable": true,
