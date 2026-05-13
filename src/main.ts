@@ -3,7 +3,7 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.4.2'
+const ESYSOFT_APP_VERSION = '1.4.3'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
 
 const DEFAULT_PIN = '000000'
@@ -91,12 +91,19 @@ async function confirmModal(opts: {
   confirmText?: string
   cancelText?: string
   variant?: ConfirmVariant
+  /** Extra class on the dialog card (e.g. exit / backup styling). */
+  cardClass?: string
+  /** When true, Enter does not confirm (avoids accidental choice on sensitive prompts). */
+  disableEnterShortcut?: boolean
+  /** Which button receives initial focus. */
+  initialFocus?: 'ok' | 'cancel'
 }): Promise<boolean> {
   // ensure only one confirm at a time
   document.querySelector('.confirm-overlay')?.remove()
 
   const overlay = makeEl('div', { className: 'confirm-overlay', attrs: { role: 'dialog', 'aria-modal': 'true' } })
-  const card = makeEl('div', { className: 'confirm-card' })
+  const cardClasses = ['confirm-card', opts.cardClass].filter(Boolean).join(' ')
+  const card = makeEl('div', { className: cardClasses })
   overlay.append(card)
 
   const v = opts.variant ?? 'default'
@@ -137,7 +144,7 @@ async function confirmModal(opts: {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') void finish(false)
-      if (e.key === 'Enter') void finish(true)
+      if (!opts.disableEnterShortcut && e.key === 'Enter') void finish(true)
     }
 
     window.addEventListener('keydown', onKey)
@@ -147,8 +154,8 @@ async function confirmModal(opts: {
     okBtn?.addEventListener('click', () => void finish(true))
     cancelBtn?.addEventListener('click', () => void finish(false))
 
-    // focus
-    queueMicrotask(() => okBtn?.focus())
+    const focusTarget = opts.initialFocus === 'cancel' ? cancelBtn : okBtn
+    queueMicrotask(() => focusTarget?.focus())
   })
 }
 
@@ -229,6 +236,64 @@ async function applyMainWindowMaximized() {
   }
 }
 
+/** `render()` runs many times; close handler must register only once or dialogs / quit break. */
+let closeBackupPromptInstalled = false
+
+async function installCloseBackupPrompt() {
+  if (closeBackupPromptInstalled) return
+  closeBackupPromptInstalled = true
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const appWindow = getCurrentWindow()
+
+    await appWindow.onCloseRequested(async (e: { preventDefault: () => void }) => {
+      e.preventDefault()
+
+      const shouldBackup = await confirmModal({
+        title: 'Close EsySoft?',
+        message:
+          'Before exiting, do you want to save a backup of your data?\n\n' +
+          'Yes — creates a .db backup (same as Settings), then closes the app.\n' +
+          'No — closes the app without creating a new backup file.',
+        confirmText: 'Yes',
+        cancelText: 'No',
+        cardClass: 'confirm-card--exit-backup',
+        disableEnterShortcut: true,
+        initialFocus: 'cancel',
+      })
+      if (shouldBackup) {
+        try {
+          await downloadBackupDbFile()
+        } catch {
+          // If backup fails for any reason, still allow the user to close.
+        }
+        // Save-file / download UI must fully dismiss before destroy (WebView2).
+        await sleepMs(320)
+      }
+
+      const forceQuit = async () => {
+        try {
+          await appWindow.destroy()
+        } catch {
+          try {
+            const { exit } = await import('@tauri-apps/plugin-process')
+            await exit(0)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      // Leave the close-request stack before tearing down the window.
+      window.setTimeout(() => {
+        void forceQuit()
+      }, 0)
+    })
+  } catch {
+    closeBackupPromptInstalled = false
+    // Not running inside Tauri (e.g. browser preview).
+  }
+}
+
 function clampDigits(s: string, maxLen: number) {
   const digitsOnly = s.replace(/\D/g, '')
   return digitsOnly.slice(0, maxLen)
@@ -295,6 +360,7 @@ function render() {
   if (!root) throw new Error('Missing #app')
   root.replaceChildren(makeAppShell())
   void applyMainWindowMaximized()
+  void installCloseBackupPrompt()
   queueMicrotask(() => void maybeCheckAppUpdates())
 }
 
@@ -340,8 +406,7 @@ function makeLogin(opts: { onSuccess: () => void }) {
     <div class="login-sub">Tracking System</div>
     <div class="login-divider"></div>
     <div class="login-info">
-      <div>Azan Online Experts</div>
-      <div>Shop No. 10, District Court, Saidu Sharif, Swat</div>
+      <div>Hayat & Brothers</div>
       <div>Hayat Ullah: +923469083693</div>
       <div>Irfan Ullah: +923349351073</div>
     </div>
@@ -548,7 +613,7 @@ function makeDeskTopbar(opts?: { onLogout?: () => void }) {
       </div>
     </div>
     <div class="top-center">
-      <div class="brand-center">AZAN Online Experts</div>
+      <div class="brand-center">Hayat & Brothers</div>
       <div class="sub-center">Application Tracking System</div>
     </div>
     <div class="top-right">
@@ -614,7 +679,7 @@ function makeHome(opts: { onLogout: () => void }) {
   const welcomeView = makeEl('section', { className: 'welcome-view is-hidden' })
   welcomeView.innerHTML = `
     <div class="welcome-inner">
-      <div class="welcome-stars">✦ AZAN Online Experts ✦</div>
+      <div class="welcome-stars">✦ Hayat & Brothers ✦</div>
       <div class="welcome-title">WELCOME TO Application Tracking System</div>
       <div class="welcome-divider"></div>
       <div class="welcome-by">SOFTWARE BY <span class="welcome-esy">EsySoft</span></div>
@@ -1040,7 +1105,7 @@ function makeHome(opts: { onLogout: () => void }) {
     <table>
       <thead>
         <tr>
-          <th>ID</th><th>Date</th><th>Name</th><th>CNIC</th><th>Tracking ID</th><th>Entry</th><th>Category</th><th>Status</th><th>Action</th>
+          <th>ID</th><th>Date</th><th>Name</th><th>CNIC</th><th>Reference</th><th>Entry</th><th>Category</th><th>Status</th><th>Action</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -1113,24 +1178,24 @@ function makeHome(opts: { onLogout: () => void }) {
     const take = filter === 'showAll' ? filtered : filtered.slice(0, 200)
     const searchActive = dashSearchQuery.trim().length > 0
     const searched = searchActive ? take.filter((e) => entryMatchesQuery(e, dashSearchQuery)) : take
-    const buckets = dashboardCnicBuckets(take, searched, searchActive)
+    const buckets = dashboardReferenceBuckets(take, searched, searchActive)
     const html = buckets
       .map((bucket, idx) => {
         // Show the most recent entry in the group, but keep group's position stable.
         const rep = bucket[bucket.length - 1] ?? bucket[0]
         const n = bucket.length
         const status = entryStatusLabel(rep)
-        const trackingCell =
+        const referenceCell =
           n === 1
-            ? (rep.trackingId || '-').replaceAll('<', '&lt;')
-            : `${(rep.trackingId || '').trim() || '—'} (+${n - 1})`.replaceAll('<', '&lt;')
+            ? (rep.reference || '-').replaceAll('<', '&lt;')
+            : `${(rep.reference || '').trim() || '—'} (+${n - 1})`.replaceAll('<', '&lt;')
         return `
           <tr data-entry-id="${rep.id}">
             <td>${idx + 1}</td>
             <td>${(rep.entryDate || '-').replaceAll('<', '&lt;')}</td>
             <td>${(rep.name || '-').replaceAll('<', '&lt;')}</td>
             <td>${(rep.cnic || '-').replaceAll('<', '&lt;')}</td>
-            <td>${trackingCell}</td>
+            <td>${referenceCell}</td>
             <td>${n}</td>
             <td>${(rep.category || '-').replaceAll('<', '&lt;')}</td>
             <td><span class="pill ${status.toLowerCase()}">${status}</span></td>
@@ -1471,7 +1536,7 @@ function makeHome(opts: { onLogout: () => void }) {
     })
   })
 
-  /** ESC = Back (subview → dashboard, welcome → dashboard). ESC×2 on dashboard = Home (welcome). */
+  /** ESC: entry/welcome → home tiles; F1 dashboard (treeview) → home tiles in one press. ESC×2 on home tiles = welcome. */
   let escDuoCount = 0
   let escDuoTimer: ReturnType<typeof setTimeout> | null = null
   const onHomeEsc = (e: KeyboardEvent) => {
@@ -1516,6 +1581,22 @@ function makeHome(opts: { onLogout: () => void }) {
       e.preventDefault()
       e.stopPropagation()
         showHomeMenu()
+      return
+    }
+
+    const dashActive =
+      !dashView.classList.contains('is-hidden') &&
+      homeMenuView.classList.contains('is-hidden') &&
+      entryView.classList.contains('is-hidden')
+    if (dashActive) {
+      escDuoCount = 0
+      if (escDuoTimer !== null) {
+        window.clearTimeout(escDuoTimer)
+        escDuoTimer = null
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      showHomeMenu()
       return
     }
 
@@ -1597,29 +1678,34 @@ function entryMatchesQuery(e: Entry, q: string): boolean {
   return fields.some((f) => f.toLowerCase().includes(s))
 }
 
-/** Same CNIC (normalized) → one group; blank CNIC rows never merge. */
-function cnicGroupingKey(entry: Entry): string {
-  const raw = entry.cnic.trim()
+/** Same reference (trimmed, case-insensitive) → one group; blank reference rows never merge. */
+function referenceGroupingKey(entry: Entry): string {
+  const raw = entry.reference.trim()
   if (!raw) return `∅:${entry.id}`
-  const digits = raw.replace(/\D/g, '')
-  if (digits.length >= 11) return digits
-  return raw.replace(/\s/g, '').toLowerCase()
+  return raw.toLowerCase()
 }
 
-/** Bucket main-list rows so one NIC = one dashboard line; if search is on, only groups whose CNIC matched at least one hit (whole group rows still listed from `takeFiltered`). */
-function dashboardCnicBuckets(takeFiltered: Entry[], searched: Entry[], searchActive: boolean): Entry[][] {
-  const matchedKeys = searchActive ? new Set(searched.map((e) => cnicGroupingKey(e))) : null
-  const keys = [...new Set(takeFiltered.map((e) => cnicGroupingKey(e)))].filter((k) =>
+/** Bucket main-list rows so one reference = one dashboard line; if search is on, only groups whose reference matched at least one hit (whole group rows still listed from `takeFiltered`). */
+function dashboardReferenceBuckets(takeFiltered: Entry[], searched: Entry[], searchActive: boolean): Entry[][] {
+  const matchedKeys = searchActive ? new Set(searched.map((e) => referenceGroupingKey(e))) : null
+  const keys = [...new Set(takeFiltered.map((e) => referenceGroupingKey(e)))].filter((k) =>
     matchedKeys ? matchedKeys.has(k) : true,
   )
   // Preserve storage order so entries appended/inserted appear "under" the record.
-  return keys.map((k) => takeFiltered.filter((e) => cnicGroupingKey(e) === k))
+  return keys.map((k) => takeFiltered.filter((e) => referenceGroupingKey(e) === k))
 }
 
 function entryLineProfit(e: Entry) {
   const s = e.salePrice ?? 0
   const c = e.costPrice ?? 0
   return Math.round((s - c) * 100) / 100
+}
+
+/** Amount already collected toward sale (sale − remaining dues); ignores cost. */
+function entryPaidTowardSale(e: Entry): number {
+  const sp = e.salePrice
+  if (sp == null) return 0
+  return Math.round(Math.max(0, sp - entryLineDues(e)) * 100) / 100
 }
 
 function entryActionCellHtml(
@@ -1666,8 +1752,7 @@ function escAttr(s: string) {
 
 /** Shop block on printed bills / detail sheets (matches app branding). */
 const PRINT_INVOICE_SHOP = {
-  name: 'AZAN ONLINE EXPERTS',
-  addressLine: 'Shop No. 10, District Court, Saidu Sharif, Swat',
+  name: 'Hayat & Brothers',
   phone: '+92 334 9351073',
 } as const
 
@@ -1737,7 +1822,6 @@ body{
   color:#fff;
 }
 .inv-brand{font-size:1.35rem;font-weight:800;letter-spacing:.04em;}
-.inv-addr{font-size:.78rem;opacity:.92;margin-top:8px;line-height:1.45;}
 .inv-phone{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.82rem;margin-top:10px;}
 .inv-phone svg{flex-shrink:0;}
 .inv-badge{
@@ -1786,7 +1870,6 @@ const PRINT_INVOICE_SHEET_A4 = `@page{size:A4 portrait;margin:12mm;}`
 const PRINT_INVOICE_SHEET_A6 = `@page{size:A6 portrait;margin:4mm 5mm;}
 .invoice--a6.invoice-root{border-radius:8px;}
 .invoice--a6 .inv-brand{font-size:1.02rem;}
-.invoice--a6 .inv-addr{font-size:.65rem;margin-top:4px;line-height:1.35;}
 .invoice--a6 .inv-phone{font-size:.7rem;margin-top:6px;}
 .invoice--a6 .inv-phone svg{width:11px;height:11px;}
 .invoice--a6 .inv-badge{margin-top:8px;padding:5px 11px;font-size:.58rem;}
@@ -1825,7 +1908,6 @@ function buildInvoiceHeader(badgeLabel: string) {
   const p = escHtml(PRINT_INVOICE_SHOP.phone)
   return `<header class="inv-head">
   <div class="inv-brand">${escHtml(PRINT_INVOICE_SHOP.name)}</div>
-  <div class="inv-addr">${escHtml(PRINT_INVOICE_SHOP.addressLine)}</div>
   <div class="inv-phone" style="color:var(--inv-red-phone)">${PRINT_INVOICE_PHONE_ICON}<span style="color:#fff">${p}</span></div>
   <div class="inv-badge">${escHtml(badgeLabel)}</div>
 </header>`
@@ -2050,8 +2132,8 @@ function openEntryViewDetailModal(
   opts: { onEdit?: (e: Entry) => void; onNewEntry?: (ins: NewEntryInsertOpts) => void; onChanged?: () => void } = {},
 ) {
   if (document.querySelector('.dues-modal-overlay')) return
-  const groupKey = cnicGroupingKey(entry)
-  const loadGroup = () => loadEntries().filter((e) => cnicGroupingKey(e) === groupKey)
+  const groupKey = referenceGroupingKey(entry)
+  const loadGroup = () => loadEntries().filter((e) => referenceGroupingKey(e) === groupKey)
 
   const overlay = makeEl('div', { className: 'dues-modal-overlay' })
   const modal = makeEl('div', { className: 'dues-modal entry-cnic-group-modal' })
@@ -2089,10 +2171,10 @@ function openEntryViewDetailModal(
       <div class="dues-modal-hd">
         <div class="dues-modal-hd-top">
           <div class="dues-modal-hd-name">${esc(selected.name.trim() || '—')}</div>
-          <div class="dues-modal-hd-cnic">CNIC: ${esc(first.cnic.trim() || '—')}</div>
+          <div class="dues-modal-hd-cnic">CNIC: ${esc(first.cnic.trim() || '—')} · Reference: ${esc(first.reference.trim() || '—')}</div>
         </div>
         <div class="dues-modal-hd-sub">
-          <span class="dues-modal-hd-kicker">${ICON_DOC}<span>Client detail (${group.length} entr${group.length === 1 ? 'y' : 'ies'} — same CNIC)</span></span>
+          <span class="dues-modal-hd-kicker">${ICON_DOC}<span>Client detail (${group.length} entr${group.length === 1 ? 'y' : 'ies'} — same reference)</span></span>
           <span class="dues-modal-sep">|</span>
           <span>Father: ${esc(selected.fatherName.trim() || '—')}</span>
         </div>
@@ -2197,6 +2279,7 @@ function openEntryViewDetailModal(
         name: (cur.name || '').trim(),
         fatherName: (cur.fatherName || '').trim(),
         cnic: (cur.cnic || '').trim(),
+        reference: (cur.reference || '').trim(),
         mobileNumber: (cur.mobileNumber || '').trim(),
         policeStation: (cur.policeStation || '').trim(),
         category: (cur.category || '').trim(),
@@ -2477,6 +2560,13 @@ function lineDues(l: WeaponAllotLine) {
   return computeDues(l.salePrice, l.cashReceived)
 }
 
+/** Collected toward weapon sale (sale − dues); no cost. */
+function weaponLinePaidTowardSale(l: WeaponAllotLine): number {
+  const sp = l.salePrice
+  if (sp == null) return 0
+  return Math.round(Math.max(0, sp - lineDues(l)) * 100) / 100
+}
+
 /** Sum of recorded receipts on visible lines (search + date filter): cash received, plus full-paid rows (empty cash → count sale). */
 function totalPaidRecordedOnWeaponLines(lines: WeaponAllotLine[]): number {
   let t = 0
@@ -2559,6 +2649,28 @@ function ensureExpenseListScrollResizeListener() {
   if (expenseListScrollResizeBound) return
   expenseListScrollResizeBound = true
   window.addEventListener('resize', syncExpenseListScrollHeightInDom)
+}
+
+/** General entry grouped list: WebView2 ignores flex/grid shrink here too — force list height in px (same idea as expenses). */
+function applyGeneralEntryListScrollHeightPx(el: HTMLElement) {
+  const reserve = 340
+  const cap = Math.max(180, window.innerHeight - reserve)
+  el.style.height = `${cap}px`
+  el.style.maxHeight = `${cap}px`
+  el.style.minHeight = '140px'
+  el.style.overflowY = 'scroll'
+}
+
+function syncGeneralEntryListScrollHeightInDom() {
+  const el = document.querySelector<HTMLElement>('.allot-table-scroll-general')
+  if (el) applyGeneralEntryListScrollHeightPx(el)
+}
+
+let generalEntryListScrollResizeBound = false
+function ensureGeneralEntryListScrollResizeListener() {
+  if (generalEntryListScrollResizeBound) return
+  generalEntryListScrollResizeBound = true
+  window.addEventListener('resize', syncGeneralEntryListScrollHeightInDom)
 }
 
 function filterWeaponLinesForTable(
@@ -2968,7 +3080,7 @@ function makeWeaponAllotScreen(opts: { onBack: () => void }) {
         </div>
         <div class="brandtxt">
           <div class="brandname">${escHtml(PRINT_INVOICE_SHOP.name)}</div>
-          <div class="brandsub">${escHtml(PRINT_INVOICE_SHOP.addressLine)} · ${escHtml(PRINT_INVOICE_SHOP.phone)}</div>
+          <div class="brandsub">${escHtml(PRINT_INVOICE_SHOP.phone)}</div>
         </div>
       </div>
       <div class="stmt">
@@ -3323,6 +3435,12 @@ function generalDuesRemaining(r: GeneralEntryLine): number {
   return Math.max(0, r.amount - c)
 }
 
+/** Amount already collected on a general dues line. */
+function generalDuesPaidAmount(r: GeneralEntryLine): number {
+  if (r.kind !== 'dues') return 0
+  return Math.min(r.amount, Math.max(0, r.collected ?? 0))
+}
+
 function generalEntryDisplayName(r: GeneralEntryLine): string {
   return (r.name || '').trim() || r.description.trim() || '—'
 }
@@ -3611,15 +3729,16 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
     msg.textContent = ''
   })
 
-  const row = makeEl('div', { className: 'allot-fields allot-fields-general' })
-  row.append(
+  const rowTop = makeEl('div', { className: 'allot-fields allot-fields-general-top' })
+  rowTop.append(
     mkField('Date', entryDate),
     mkField('Name', name),
     mkField('Details', description),
     mkField('Amount', amount),
-    mkField('Type', kind),
   )
-  card.append(kicker, row, msg, actions)
+  const rowBottom = makeEl('div', { className: 'allot-general-form-bottom' })
+  rowBottom.append(mkField('Type', kind), actions)
+  card.append(kicker, rowTop, rowBottom, msg)
   form.append(card)
 
   const tableScroll = makeEl('div', {
@@ -3914,6 +4033,11 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
 
   renderRows()
   wrap.append(head, form, tableScroll)
+
+  ensureGeneralEntryListScrollResizeListener()
+  queueMicrotask(() => applyGeneralEntryListScrollHeightPx(tableScroll))
+  window.requestAnimationFrame(() => applyGeneralEntryListScrollHeightPx(tableScroll))
+
   return wrap
 }
 
@@ -3924,7 +4048,8 @@ type DuesRow = {
   count: number
   nameRef: string
   cnic: string
-  mobile: string
+  /** App: reference; weapon: client; general: description (dues list column). */
+  referenceOta: string
   totalDues: number
 }
 
@@ -4053,8 +4178,7 @@ function printDuesReferenceDetail(entries: Entry[]) {
 </head><body>
   <div class="sheet">
     <div class="hd">
-      <div class="brand">AZAN ONLINE EXPERTS</div>
-      <div class="addr">Shop No. 10, District Court, Saidu Sharif, Swat</div>
+      <div class="brand">Hayat & Brothers</div>
       <div class="title">Dues Detail</div>
       <div class="sub">Ref: <b>${escHtml(ref)}</b>  |  Name: <b>${escHtml(name)}</b>  |  CNIC: <b>${escHtml(cnic)}</b></div>
     </div>
@@ -4118,8 +4242,7 @@ function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
 </head><body>
   <div class="sheet">
     <div class="hd">
-      <div class="brand">AZAN ONLINE EXPERTS</div>
-      <div class="addr">Shop No. 10, District Court, Saidu Sharif, Swat</div>
+      <div class="brand">Hayat & Brothers</div>
       <div class="title">General Dues Detail</div>
       <div class="sub">Name: <b>${escHtml(label)}</b></div>
     </div>
@@ -4238,7 +4361,7 @@ function buildBackupObject() {
   return {
     format: BACKUP_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
-    app: 'EsySoft_AzanOnlineExperts',
+    app: 'EsySoft_HayatBrothers',
     keys,
   }
 }
@@ -4246,7 +4369,7 @@ function buildBackupObject() {
 async function downloadBackupDbFile(): Promise<string> {
   const payload = buildBackupObject()
   const text = JSON.stringify(payload, null, 2)
-  const suggestedName = `esysoft_azan_${new Date().toISOString().slice(0, 10)}.db`
+  const suggestedName = `esysoft_hayat_${new Date().toISOString().slice(0, 10)}.db`
 
   const w = window as unknown as {
     showSaveFilePicker?: (options: {
@@ -4802,7 +4925,7 @@ function buildDuesRows(): DuesRow[] {
       count: list.length,
       nameRef,
       cnic: first.cnic.trim() || '—',
-      mobile: first.mobileNumber.trim() || '—',
+      referenceOta: first.reference.trim() || '—',
       totalDues,
     })
   }
@@ -4815,13 +4938,14 @@ function buildDuesRows(): DuesRow[] {
   }
   for (const [client, list] of wMap) {
     const totalDues = list.reduce((s, x) => s + lineDues(x), 0)
+    const wFirst = list[0]
     rows.push({
       kind: 'weapon',
       groupKey: client,
       count: list.length,
       nameRef: client,
       cnic: '—',
-      mobile: '—',
+      referenceOta: (wFirst?.weaponNumber || '').trim() || '—',
       totalDues,
     })
   }
@@ -4835,13 +4959,14 @@ function buildDuesRows(): DuesRow[] {
   for (const [k, list] of gMap) {
     const totalDues = list.reduce((s, x) => s + generalDuesRemaining(x), 0)
     const label = list[0] ? generalEntryDisplayName(list[0]) : k || '—'
+    const gFirst = list[0]
     rows.push({
       kind: 'general',
       groupKey: k,
       count: list.length,
       nameRef: label,
       cnic: '—',
-      mobile: '—',
+      referenceOta: (gFirst?.description || '').trim() || '—',
       totalDues,
     })
   }
@@ -4995,7 +5120,7 @@ function makeDuesScreen(opts: { onBack: () => void }) {
 
   const hint = makeEl('p', {
     className: 'dues-hint',
-    text: 'Search by Name / CNIC / Reference — grouped by Reference | Double-click a row to open detail & collect',
+    text: 'Search by Name / CNIC / Reference OTA — grouped by Reference | Double-click a row to open detail & collect',
   })
 
   const table = makeEl('div', { className: 'table dues-table' })
@@ -5004,9 +5129,9 @@ function makeDuesScreen(opts: { onBack: () => void }) {
       <thead>
         <tr>
           <th>Type</th>
-          <th>Name/Reference</th>
+          <th>Name</th>
           <th>CNIC</th>
-          <th>Mobile</th>
+          <th>Reference OTA</th>
           <th>Entries</th>
           <th>Total Dues</th>
         </tr>
@@ -5026,7 +5151,7 @@ function makeDuesScreen(opts: { onBack: () => void }) {
           (r) =>
             r.nameRef.toLowerCase().includes(q) ||
             r.cnic.toLowerCase().includes(q) ||
-            r.mobile.toLowerCase().includes(q),
+            r.referenceOta.toLowerCase().includes(q),
         )
       : all
     let totalOut = 0
@@ -5047,7 +5172,7 @@ function makeDuesScreen(opts: { onBack: () => void }) {
           <td class="dues-type-cell"><span class="dues-type-ico">${ico}</span><span class="dues-type-lbl">${lbl}(${r.count})</span></td>
           <td>${escCell(r.nameRef)}</td>
           <td>${escCell(r.cnic)}</td>
-          <td>${escCell(r.mobile)}</td>
+          <td>${escCell(r.referenceOta)}</td>
           <td>${r.count}</td>
           <td>${formatRs(r.totalDues)}</td>
         </tr>`
@@ -5381,7 +5506,7 @@ function isoDateMatchesReportFilter(
 
 function filterReportEntries(
   entries: Entry[],
-  mode: 'daily' | 'monthly' | 'custom' | 'full',
+  mode: 'daily' | 'monthly' | 'custom',
   fromIso: string,
   toIso: string,
 ): Entry[] {
@@ -5465,7 +5590,7 @@ function reportModeTitle(mode: 'daily' | 'monthly' | 'custom' | 'full'): string 
   return 'CUSTOM RANGE'
 }
 
-function printAzanStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fromIso: string, toIso: string) {
+function printAccountStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fromIso: string, toIso: string) {
   const rows = buildStatementRows(mode, fromIso, toIso)
   const totalSale = rows.reduce((s, r) => s + (r.kind !== 'expense' && r.sale != null ? r.sale : 0), 0)
   const totalCost = rows.reduce((s, r) => s + (r.kind !== 'expense' && r.cost != null ? r.cost : 0), 0)
@@ -5587,7 +5712,7 @@ function printAzanStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fromI
       </div>
       <div class="brandtxt">
         <div class="brandname">${esc(PRINT_INVOICE_SHOP.name)}</div>
-        <div class="brandsub">${esc(PRINT_INVOICE_SHOP.addressLine)} · ${esc(PRINT_INVOICE_SHOP.phone)}</div>
+        <div class="brandsub">${esc(PRINT_INVOICE_SHOP.phone)}</div>
       </div>
     </div>
     <div class="stmt">
@@ -5658,6 +5783,192 @@ function printAzanStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fromI
 </div>
 </body></html>`
 
+  printFullDocument(html)
+}
+
+type ClientDetailHit =
+  | { kind: 'app'; entry: Entry }
+  | { kind: 'weapon'; line: WeaponAllotLine }
+  | { kind: 'general'; row: GeneralEntryLine }
+
+function matchesClientDetailSearch(qRaw: string, parts: string[]): boolean {
+  const n = qRaw.trim().toLowerCase()
+  if (!n) return false
+  const blob = parts.join(' ').toLowerCase()
+  const tokens = n.split(/\s+/).filter(Boolean)
+  if (!tokens.length) return false
+  return tokens.every((t) => blob.includes(t))
+}
+
+function collectClientDetailHits(query: string): ClientDetailHit[] {
+  const out: ClientDetailHit[] = []
+  const q = query
+  if (!q.trim()) return out
+  for (const e of loadEntries()) {
+    const parts = [
+      e.name,
+      e.fatherName,
+      e.cnic,
+      e.trackingId,
+      e.reference,
+      e.mobileNumber,
+      e.policeStation,
+      e.category,
+      e.weaponNumber,
+    ]
+    if (matchesClientDetailSearch(q, parts)) out.push({ kind: 'app', entry: e })
+  }
+  for (const l of loadWeaponAllotLines()) {
+    if (matchesClientDetailSearch(q, [l.client, l.weaponNumber])) out.push({ kind: 'weapon', line: l })
+  }
+  for (const r of loadGeneralEntries()) {
+    if (r.kind !== 'dues') continue
+    if (matchesClientDetailSearch(q, [r.name, r.description])) out.push({ kind: 'general', row: r })
+  }
+  out.sort((a, b) => {
+    const da = a.kind === 'app' ? a.entry.entryDate : a.kind === 'weapon' ? a.line.entryDate : a.row.entryDate
+    const db = b.kind === 'app' ? b.entry.entryDate : b.kind === 'weapon' ? b.line.entryDate : b.row.entryDate
+    const c0 = db.localeCompare(da)
+    if (c0 !== 0) return c0
+    const ia = a.kind === 'app' ? a.entry.id : a.kind === 'weapon' ? a.line.id : a.row.id
+    const ib = b.kind === 'app' ? b.entry.id : b.kind === 'weapon' ? b.line.id : b.row.id
+    return ia.localeCompare(ib)
+  })
+  return out
+}
+
+function printClientDetailStatement(query: string) {
+  const esc = escHtml
+  const q = query.trim()
+  if (!q) {
+    window.alert('Enter a search term first, then click Print.')
+    return
+  }
+  const hits = collectClientDetailHits(q)
+  let totalPaid = 0
+  let totalDues = 0
+  const rowsHtml = hits
+    .map((h, i) => {
+      let typeL = ''
+      let date = ''
+      let name = ''
+      let detail = ''
+      let cnicOr = ''
+      let saleV: number | null = null
+      let paid = 0
+      let dues = 0
+      let status = ''
+      if (h.kind === 'app') {
+        const e = h.entry
+        typeL = 'Application'
+        date = formatDateDisplay(e.entryDate)
+        name = (e.name || '').trim() || '—'
+        detail =
+          [e.reference, e.trackingId, e.category].map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
+        cnicOr = (e.cnic || '').trim() || '—'
+        saleV = e.salePrice
+        paid = entryPaidTowardSale(e)
+        dues = entryLineDues(e)
+        status = entryStatusLabel(e)
+      } else if (h.kind === 'weapon') {
+        const l = h.line
+        typeL = 'Weapon allot'
+        date = formatDateDisplay(l.entryDate)
+        name = (l.client || '').trim() || '—'
+        detail = (l.weaponNumber || '').trim() || '—'
+        cnicOr = '—'
+        saleV = l.salePrice
+        paid = weaponLinePaidTowardSale(l)
+        dues = lineDues(l)
+        status = dues > 0.001 ? 'Pending dues' : '—'
+      } else {
+        const r = h.row
+        typeL = 'General dues'
+        date = formatDateDisplay(r.entryDate)
+        name = generalEntryDisplayName(r)
+        detail = (r.description || '').trim() || '—'
+        cnicOr = '—'
+        saleV = r.amount
+        paid = generalDuesPaidAmount(r)
+        dues = generalDuesRemaining(r)
+        status = dues > 0.001 ? 'Active' : 'Settled'
+      }
+      totalPaid += paid
+      totalDues += dues
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${esc(typeL)}</td>
+        <td>${esc(date)}</td>
+        <td>${esc(name)}</td>
+        <td>${esc(detail)}</td>
+        <td>${esc(cnicOr)}</td>
+        <td class="num">${saleV != null ? formatRs(saleV) : '—'}</td>
+        <td class="num">${formatRs(paid)}</td>
+        <td class="num td-dues">${formatRs(dues)}</td>
+        <td>${esc(status)}</td>
+      </tr>`
+    })
+    .join('')
+  const count = hits.length
+  const now = new Date()
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>${escAttr(`Client detail — ${q}`)}</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  :root{--ink:#0f172a;--mut:#475569;--line:#e2e8f0;--head:#0b3b66;}
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--ink);margin:0;padding:0;background:#f1f5f9;font-size:11px;}
+  .sheet{max-width:190mm;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .top{padding:14px 16px;background:var(--head);color:#fff;}
+  .brand{font-weight:1000;font-size:14px;letter-spacing:.06em;}
+  .sub{font-size:10px;opacity:.92;margin-top:4px;font-weight:800;}
+  .meta{margin-top:10px;font-size:10px;font-weight:800;opacity:.95;}
+  .sec-h{font-weight:1000;text-transform:uppercase;letter-spacing:.08em;font-size:10px;color:var(--mut);padding:10px 16px 6px;background:#fafafa;border-top:1px solid var(--line);}
+  table{width:100%;border-collapse:collapse;font-size:10px;}
+  th{background:var(--head);color:#fff;font-weight:1000;padding:8px 6px;text-align:left;border-bottom:1px solid #083257;}
+  th.num,td.num{text-align:right;}
+  td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:nth-child(even) td{background:#f8fafc;}
+  .td-dues{color:#dc2626;font-weight:1000;}
+  .sumwrap{padding:0 16px 14px;}
+  .sum{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden;}
+  .sum-h{background:var(--head);color:#fff;font-weight:1000;text-transform:uppercase;font-size:10px;padding:8px 10px;}
+  .sum-b{background:#fff;}
+  .sum-r{display:flex;justify-content:space-between;padding:8px 10px;border-top:1px solid var(--line);font-weight:1000;}
+  .sum-r:first-child{border-top:none;}
+  .sum-r .lab{color:var(--mut);font-weight:900;}
+  .foot{padding:12px 16px;font-size:9.5px;color:var(--mut);border-top:1px solid var(--line);}
+  @media print{body{background:#fff}.sheet{border:none;border-radius:0}}
+</style></head><body>
+<div class="sheet">
+  <div class="top">
+    <div class="brand">${esc(PRINT_INVOICE_SHOP.name)}</div>
+    <div class="sub">Client detail statement · Search: ${esc(q)}</div>
+    <div class="meta">Printed ${esc(`${formatHeaderDate(now)} ${formatHeaderTime(now)}`)} · PKR · Cost and profit are not shown on this sheet.</div>
+  </div>
+  <div class="sec-h">Detail</div>
+  <div style="padding:0 8px 8px">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Type</th><th>Date</th><th>Name</th><th>Reference / Client / Details</th><th>CNIC</th>
+        <th class="num">Sale</th><th class="num">Paid</th><th class="num">Dues</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rowsHtml || '<tr><td colspan="10">No matching records.</td></tr>'}</tbody>
+    </table>
+  </div>
+  <div class="sec-h">Summary</div>
+  <div class="sumwrap">
+    <div class="sum">
+      <div class="sum-h">Totals</div>
+      <div class="sum-b">
+        <div class="sum-r"><span class="lab">Total lines (applications + weapon + general)</span><span>${esc(String(count))}</span></div>
+        <div class="sum-r"><span class="lab">Total paid (collected)</span><span>${formatRs(totalPaid)}</span></div>
+        <div class="sum-r"><span class="lab">Total remaining (dues)</span><span style="color:#dc2626;font-weight:1000">${formatRs(totalDues)}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">Detail lists every matching record. Summary shows counts, total collected, and outstanding dues only.</div>
+</div>
+</body></html>`
   printFullDocument(html)
 }
 
@@ -6177,9 +6488,10 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   const title = makeEl('div', { className: 'sub-title', text: 'Reports & Statements' })
   head.append(back, title)
 
-  let mode: 'daily' | 'monthly' | 'custom' | 'full' = 'full'
+  type ReportScreenMode = 'daily' | 'monthly' | 'custom' | 'clientDetail'
+  let mode: ReportScreenMode = 'clientDetail'
   const filt = makeEl('div', { className: 'rep-filters' })
-  const mkFilt = (id: typeof mode, label: string, cls: string) => {
+  const mkFilt = (id: ReportScreenMode, label: string, cls: string) => {
     const b = makeEl('button', { className: `rep-filt ${cls}`, attrs: { type: 'button', 'data-mode': id } }) as HTMLButtonElement
     b.textContent = label
     return b
@@ -6187,13 +6499,28 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   const bDaily = mkFilt('daily', 'Daily', 'rf-blue')
   const bMonth = mkFilt('monthly', 'Monthly', 'rf-purple')
   const bCustom = mkFilt('custom', 'Custom', 'rf-green')
-  const bFull = mkFilt('full', 'Full Statement', 'rf-orange')
-  filt.append(bDaily, bMonth, bCustom, bFull)
+  const bClient = mkFilt('clientDetail', 'Client Detail Statement', 'rf-orange')
+  filt.append(bDaily, bMonth, bCustom, bClient)
 
   const customRow = makeEl('div', { className: 'rep-custom is-hidden' })
   const fromD = makeEl('input', { className: 'in', attrs: { type: 'date' } }) as HTMLInputElement
   const toD = makeEl('input', { className: 'in', attrs: { type: 'date' } }) as HTMLInputElement
   customRow.append(makeEl('span', { className: 'rep-custom-lbl', text: 'From' }), fromD, makeEl('span', { className: 'rep-custom-lbl', text: 'To' }), toD)
+
+  const clientDetailSearchIn = makeEl('input', {
+    className: 'in',
+    attrs: {
+      type: 'search',
+      placeholder: 'Name, reference, CNIC, tracking, weapon client, general dues…',
+      spellcheck: 'false',
+      'aria-label': 'Client detail statement search',
+    },
+  }) as HTMLInputElement
+  const clientSearchRow = makeEl('div', { className: 'rep-client-search is-hidden' })
+  clientSearchRow.append(
+    makeEl('span', { className: 'rep-custom-lbl', text: 'Search' }),
+    clientDetailSearchIn,
+  )
 
   const tool = makeEl('div', { className: 'rep-toolbar' })
   const summary = makeEl('div', { className: 'rep-summary' })
@@ -6216,6 +6543,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
       <tbody class="rep-tbody"></tbody>
     </table>`
   const tbody = tableWrap.querySelector<HTMLTableSectionElement>('.rep-tbody')
+  const theadTr = tableWrap.querySelector<HTMLTableRowElement>('table thead tr')
 
   const syncFiltActive = () => {
     filt.querySelectorAll('button[data-mode]').forEach((x) => {
@@ -6223,24 +6551,114 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
       b.classList.toggle('is-active', b.getAttribute('data-mode') === mode)
     })
     customRow.classList.toggle('is-hidden', mode !== 'custom')
+    clientSearchRow.classList.toggle('is-hidden', mode !== 'clientDetail')
   }
 
   const repRender = () => {
+    syncFiltActive()
+    const esc = (s: string) => s.replaceAll('<', '&lt;')
+
+    if (mode === 'clientDetail') {
+      const q = clientDetailSearchIn.value
+      const hits = collectClientDetailHits(q)
+      let totalSale = 0
+      let totalPaid = 0
+      let totalDues = 0
+      for (const h of hits) {
+        if (h.kind === 'app') {
+          totalSale += h.entry.salePrice ?? 0
+          totalPaid += entryPaidTowardSale(h.entry)
+          totalDues += entryLineDues(h.entry)
+        } else if (h.kind === 'weapon') {
+          totalSale += h.line.salePrice ?? 0
+          totalPaid += weaponLinePaidTowardSale(h.line)
+          totalDues += lineDues(h.line)
+        } else {
+          totalSale += h.row.amount
+          totalPaid += generalDuesPaidAmount(h.row)
+          totalDues += generalDuesRemaining(h.row)
+        }
+      }
+      const qDisp = q.trim() || '—'
+      summary.textContent =
+        hits.length === 0 && !q.trim()
+          ? `Client Detail Statement | Enter a search term (application fields, weapon client, general dues name/description).`
+          : `Client Detail Statement | Search: "${qDisp}" | Lines: ${hits.length} | Sale: ${formatRs(totalSale)} | Paid: ${formatRs(totalPaid)} | Dues: ${formatRs(totalDues)}`
+      if (theadTr) {
+        theadTr.innerHTML = `<th>Type</th><th>Date</th><th>Name</th><th>Reference / Client / Details</th><th>CNIC</th><th>Sale</th><th>Paid</th><th>Dues</th><th>Status</th><th>Action</th>`
+      }
+      if (tbody) {
+        tbody.innerHTML =
+          hits
+            .map((h) => {
+              if (h.kind === 'app') {
+                const e = h.entry
+                const st = entryStatusLabel(e)
+                const detail =
+                  [e.reference, e.trackingId, e.category].map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
+                return `<tr data-entry-id="${e.id}">
+            <td>Application</td>
+            <td>${esc(formatDateDisplay(e.entryDate))}</td>
+            <td>${esc(e.name || '—')}</td>
+            <td>${esc(detail)}</td>
+            <td>${esc(e.cnic || '—')}</td>
+            <td>${e.salePrice !== null ? formatRs(e.salePrice) : '—'}</td>
+            <td>${formatRs(entryPaidTowardSale(e))}</td>
+            <td class="${entryLineDues(e) > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(entryLineDues(e))}</td>
+            <td><span class="pill ${st.toLowerCase()}">${esc(st)}</span></td>
+            ${entryActionCellHtml(e, { showRecycle: true })}
+          </tr>`
+              }
+              if (h.kind === 'weapon') {
+                const l = h.line
+                const dues = lineDues(l)
+                return `<tr>
+            <td>Weapon allot</td>
+            <td>${esc(formatDateDisplay(l.entryDate))}</td>
+            <td>${esc((l.client || '').trim() || '—')}</td>
+            <td>${esc((l.weaponNumber || '').trim() || '—')}</td>
+            <td>—</td>
+            <td>${l.salePrice !== null ? formatRs(l.salePrice) : '—'}</td>
+            <td>${formatRs(weaponLinePaidTowardSale(l))}</td>
+            <td class="${dues > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(dues)}</td>
+            <td>—</td>
+            <td class="td-actions">—</td>
+          </tr>`
+              }
+              const r = h.row
+              const dues = generalDuesRemaining(r)
+              const name = generalEntryDisplayName(r)
+              const st = dues > 0.001 ? 'Active' : 'Settled'
+              return `<tr>
+            <td>General dues</td>
+            <td>${esc(formatDateDisplay(r.entryDate))}</td>
+            <td>${esc(name)}</td>
+            <td>${esc((r.description || '').trim() || '—')}</td>
+            <td>—</td>
+            <td>${formatRs(r.amount)}</td>
+            <td>${formatRs(generalDuesPaidAmount(r))}</td>
+            <td class="${dues > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(dues)}</td>
+            <td>${esc(st)}</td>
+            <td class="td-actions">—</td>
+          </tr>`
+            })
+            .join('') ||
+          `<tr><td colspan="10" class="empty">${q.trim() ? 'No matching records.' : 'Type a search term to list applications, weapon allotments, and general dues.'}</td></tr>`
+      }
+      return
+    }
+
     const base = loadEntries().slice().reverse()
     const filtered = filterReportEntries(base, mode, fromD.value, toD.value)
     const totalSale = filtered.reduce((s, e) => s + (e.salePrice ?? 0), 0)
     const totalProfit = filtered.reduce((s, e) => s + entryLineProfit(e), 0)
     const totalDues = filtered.reduce((s, e) => s + entryLineDues(e), 0)
-    const modeLabel =
-      mode === 'full'
-        ? 'Full Statement'
-        : mode === 'daily'
-          ? 'Daily'
-          : mode === 'monthly'
-            ? 'Monthly'
-            : 'Custom'
+    const modeLabel = mode === 'daily' ? 'Daily' : mode === 'monthly' ? 'Monthly' : 'Custom'
     summary.textContent = `${modeLabel} | Records: ${filtered.length} | Sale: ${formatRs(totalSale)} | Profit: ${formatRs(totalProfit)} | Dues: ${formatRs(totalDues)}`
-    const esc = (s: string) => s.replaceAll('<', '&lt;')
+    if (theadTr) {
+      theadTr.innerHTML = `<th>Date</th><th>Name</th><th>CNIC</th><th>Tracking ID</th><th>Mobile</th><th>Category</th>
+          <th>Status</th><th>Sale</th><th>Profit</th><th>Dues</th><th>Action</th>`
+    }
     if (tbody) {
       tbody.innerHTML =
         filtered
@@ -6267,7 +6685,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   filt.addEventListener('click', (ev) => {
     const b = (ev.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]')
     if (!b) return
-    const m = b.getAttribute('data-mode') as typeof mode | null
+    const m = b.getAttribute('data-mode') as ReportScreenMode | null
     if (!m) return
     mode = m
     syncFiltActive()
@@ -6275,9 +6693,11 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   })
   fromD.addEventListener('change', () => repRender())
   toD.addEventListener('change', () => repRender())
+  clientDetailSearchIn.addEventListener('input', () => repRender())
 
   printB.addEventListener('click', () => {
-    printAzanStatement(mode, fromD.value, toD.value)
+    if (mode === 'clientDetail') printClientDetailStatement(clientDetailSearchIn.value)
+    else printAccountStatement(mode, fromD.value, toD.value)
   })
 
   tableWrap.addEventListener('click', async (e) => {
@@ -6354,7 +6774,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
 
   syncFiltActive()
   repRender()
-  wrap.append(head, filt, customRow, printRow, tool, tableWrap)
+  wrap.append(head, filt, customRow, clientSearchRow, printRow, tool, tableWrap)
   return wrap
 }
 

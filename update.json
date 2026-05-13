@@ -1,11 +1,11 @@
 {
-  "version": "1.4.2",
-  "notes": "Dashboard button size and spacing changes, General Entry detail eye button improvements, and bug fixes.",
-  "pub_date": "2026-05-12T17:13:00Z",
+  "version": "1.4.3",
+  "notes": "New changes: confirmations in General Entry and dues, and more. Bug fixes.",
+  "pub_date": "2026-05-13T11:00:00+05:00",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2anJuMnV2U3FRWGdPUldDV1l5SVRUeUxBN2JzZEY4SkhkeVIxTjBXZWMrczZkdUxLK09TR1NLWUJHRUZxZTlId3JUT3F6N0d0TVhYT1hxUnUvZzk4QXd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4NjUzNjgzCWZpbGU6RVNZU09GVF8xLjQuMl94NjQtc2V0dXAuZXhlCjZzZVZXMVZuRUNaQXFkb2o0dTg1R2FWNUZRdCtIeFRUczFtWUsxZGZldkhhOTJpeloyNDlkdmg4eDlBVG0zUGE3LzJ5NkRoVFllVFZIRjhPaW9HQkFRPT0K",
-      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.4.2/ESYSOFT_1.4.2_x64-setup.exe"
+      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.4.3/ESYSOFT_1.4.3_x64-setup.exe"
     }
   }
 }

@@ -288,6 +288,7 @@ html:has(#app > .shell.mode-home) body {
 .shell.mode-home .reports-screen > .sub-head,
 .shell.mode-home .reports-screen > .rep-filters,
 .shell.mode-home .reports-screen > .rep-custom,
+.shell.mode-home .reports-screen > .rep-client-search,
 .shell.mode-home .reports-screen > .rep-toolbar {
   flex-shrink: 0;
 }
@@ -1419,16 +1420,33 @@ html:has(#app > .shell.mode-home) body {
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
-  gap: 2px;
+  gap: 3px;
+  max-width: min(640px, calc(100vw - 260px));
+  padding: 0 10px;
+  text-align: center;
 }
 
 .topbar-dark .brand-center {
-  font-weight: 1000;
-  letter-spacing: 0.08em;
-  font-size: 17px;
+  font-family: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: clamp(17px, 2.15vw, 24px);
+  line-height: 1.12;
   text-transform: uppercase;
+  white-space: nowrap;
   color: #f8fafc;
-  text-shadow: 0 0 20px rgba(251, 191, 36, 0.45), 0 1px 2px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 0 22px rgba(251, 191, 36, 0.4), 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .topbar-dark .brand-center {
+    color: transparent;
+    background: linear-gradient(185deg, #ffffff 0%, #f1f5f9 42%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(251, 191, 36, 0.38));
+  }
 }
 
 .sub-center {
@@ -2272,7 +2290,7 @@ html:has(#app > .shell.mode-home) body {
   color: rgba(255, 255, 255, 0.58);
 }
 
-/* Match reference “Azan” weapon screen: green accents, grouped table + eye expand */
+/* Match reference weapon screen: green accents, grouped table + eye expand */
 .shell.mode-home .allot-screen-weapon .allot-save {
   background: linear-gradient(135deg, rgb(21 128 61), rgb(34 197 94)) !important;
   border-color: rgba(34, 197, 94, 0.45) !important;
@@ -2564,6 +2582,84 @@ html:has(#app > .shell.mode-home) body {
 
 .allot-fields-exp {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* General entry: Date + Name + Details + Amount on one line (name/detail a bit tighter), type + Save below; list always scroll-capable */
+.shell.mode-home .workspace > .entry-view:not(.is-hidden) > section.allot-screen-general {
+  grid-template-rows: auto auto minmax(160px, 1fr);
+  gap: 8px;
+}
+
+.shell.mode-home .workspace > .entry-view:not(.is-hidden) > section.allot-screen-general > .allot-form {
+  min-height: 0;
+}
+
+.shell.mode-home .workspace > .entry-view:not(.is-hidden) > section.allot-screen-general > .allot-table-scroll {
+  min-height: 0;
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: auto;
+  /* scroll (not auto) so WebView2 keeps a vertical gutter; list body scrolls inside bounded row */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+.allot-fields-general-top {
+  display: grid;
+  grid-template-columns: minmax(0, 8.25rem) minmax(0, 0.65fr) minmax(0, 0.65fr) minmax(0, 6.75rem);
+  gap: 8px 10px;
+  align-items: start;
+}
+
+.allot-fields-general-top .f {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.allot-fields-general-top .in {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.allot-fields-general-top .fl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.allot-general-form-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin-top: 2px;
+}
+
+.allot-general-form-bottom > .f {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 7.5rem;
+  max-width: 12rem;
+}
+
+.allot-general-form-bottom > .f .in {
+  width: 100%;
+  min-width: 0;
+}
+
+.allot-general-form-bottom .allot-actions {
+  margin-top: 0;
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .allot-live {
@@ -2874,6 +2970,65 @@ tr.dues-row:hover td {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Exit + backup prompt: prominent Yes / No */
+.confirm-card.confirm-card--exit-backup {
+  width: min(500px, calc(100vw - 28px));
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.12),
+    0 28px 90px rgba(0, 0, 0, 0.72);
+}
+
+.confirm-card--exit-backup .confirm-hd {
+  padding: 20px 22px 14px;
+  background: linear-gradient(165deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.92) 55%, rgba(2, 6, 23, 0.95) 100%);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.confirm-card--exit-backup .confirm-title {
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  background: linear-gradient(90deg, #fef9c3, #fde68a, #fbbf24);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.confirm-card--exit-backup .confirm-bd {
+  padding: 16px 22px 10px;
+}
+
+.confirm-card--exit-backup .confirm-msg {
+  font-size: 13px;
+  line-height: 1.65;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.confirm-card--exit-backup .confirm-actions {
+  padding: 16px 22px 22px;
+  gap: 12px;
+  justify-content: stretch;
+}
+
+.confirm-card--exit-backup .confirm-actions .btn {
+  flex: 1;
+  padding: 12px 14px;
+  font-weight: 950;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+.confirm-card--exit-backup .confirm-actions .confirm-cancel {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: rgba(248, 250, 252, 0.95);
+}
+
+.confirm-card--exit-backup .confirm-actions .confirm-ok {
+  box-shadow: 0 4px 18px rgba(251, 191, 36, 0.22);
 }
 
 .dues-modal.entry-cnic-group-modal {
@@ -5605,6 +5760,19 @@ body.theme-light .stat-warn-caption {
   color: rgba(148, 163, 184, 0.9);
 }
 
+.rep-client-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 2px;
+}
+
+.rep-client-search .in {
+  flex: 1;
+  min-width: min(520px, 100%);
+}
+
 .rep-toolbar {
   display: flex;
   align-items: flex-start;
@@ -5664,7 +5832,7 @@ body.theme-light .desk.dark {
   border-color: rgba(17, 24, 39, 0.1);
 }
 
-/* Header stays dark (AZAN + clock readable) even in light app theme */
+/* Header stays dark (shop name + clock readable) even in light app theme */
 body.theme-light .topbar-dark {
   background: #0b1224;
   color: rgba(255, 255, 255, 0.92);
@@ -5679,10 +5847,20 @@ body.theme-light .topbar-dark .brand-mini {
   color: #fbbf24;
 }
 
-body.theme-light .topbar-dark .brand-center,
-body.theme-light .topbar-dark .sub-center {
+body.theme-light .topbar-dark .brand-center {
   color: #f8fafc;
   text-shadow: 0 0 18px rgba(251, 191, 36, 0.35), 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  body.theme-light .topbar-dark .brand-center {
+    color: transparent;
+    background: linear-gradient(185deg, #ffffff 0%, #f1f5f9 42%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 18px rgba(251, 191, 36, 0.35));
+  }
 }
 
 body.theme-light .topbar-dark .sub-center {
