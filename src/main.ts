@@ -3,7 +3,7 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.4.3'
+const ESYSOFT_APP_VERSION = '1.5.0'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
 
 const DEFAULT_PIN = '000000'
@@ -4127,140 +4127,6 @@ function applyCollectionToEntries(entries: Entry[], amount: number): Entry[] {
   })
 }
 
-function printDuesReferenceDetail(entries: Entry[]) {
-  if (!entries.length) return
-  const sorted = entries
-    .slice()
-    .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
-  const first = sorted[0]
-  const ref = first.reference.trim() || '—'
-  const name = first.name.trim() || '—'
-  const cnic = first.cnic.trim() || '—'
-  const totalDues = sorted.reduce((s, e) => s + entryLineDues(e), 0)
-
-  const rows = sorted
-    .map((e, i) => {
-      const sale = e.salePrice ?? 0
-      const recvRaw = e.cashReceived
-      const recv = recvRaw === null ? sale : recvRaw
-      const dues = entryLineDues(e)
-      return `<tr>
-        <td>${i + 1}</td>
-        <td>${escHtml(e.name.trim() || '—')}</td>
-        <td>${escHtml(e.fatherName.trim() || '—')}</td>
-        <td>${escHtml(e.mobileNumber.trim() || '—')}</td>
-        <td style="text-align:right">${escHtml(formatRs(sale))}</td>
-        <td style="text-align:right">${escHtml(formatRs(recv))}</td>
-        <td style="text-align:right">${escHtml(formatRs(dues))}</td>
-      </tr>`
-    })
-    .join('')
-
-  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-<title>${escAttr(`Dues detail — ${ref}`)}</title>
-<style>
-  :root{--bg:#0b1224;--card:#0f172a;--line:rgba(148,163,184,.18);--mut:rgba(226,232,240,.78);--txt:#f8fafc;--acc:#fbbf24;--red:#dc2626;}
-  *{box-sizing:border-box;}
-  body{margin:0;padding:18px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0a1020;color:var(--txt);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .sheet{max-width:960px;margin:0 auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:linear-gradient(165deg,#111a30 0%,#0b1224 45%,#0a1628 100%);box-shadow:0 22px 60px rgba(0,0,0,.45);}
-  .hd{padding:16px 16px 12px;border-bottom:1px solid var(--line);background:rgba(15,23,42,.95);}
-  .brand{font-weight:1000;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-size:13px;}
-  .addr{margin-top:6px;color:rgba(226,232,240,.78);font-weight:700;font-size:12px;line-height:1.35;}
-  .title{margin-top:6px;font-size:18px;font-weight:1000;}
-  .sub{margin-top:8px;color:rgba(248,250,252,.92);font-weight:900;font-size:12px;line-height:1.45;}
-  table{width:100%;border-collapse:collapse;font-size:12px;}
-  thead th{position:sticky;top:0;background:#0f172a;color:rgba(226,232,240,.78);text-transform:uppercase;letter-spacing:.06em;font-size:10px;font-weight:1000;padding:10px;border-bottom:1px solid var(--line);}
-  tbody td{padding:10px;border-bottom:1px solid rgba(148,163,184,.12);color:rgba(248,250,252,.92);font-weight:700;}
-  tbody tr:nth-child(even) td{background:rgba(255,255,255,.02);}
-  .ft{padding:12px 16px;background:linear-gradient(90deg, rgba(185, 28, 28, 0.95), rgba(220, 38, 38, 0.88));font-weight:1000;}
-  @media print{body{padding:0;background:#0a1020}.sheet{box-shadow:none;border-radius:0;max-width:none} thead th{position:static}}
-</style>
-</head><body>
-  <div class="sheet">
-    <div class="hd">
-      <div class="brand">Hayat & Brothers</div>
-      <div class="title">Dues Detail</div>
-      <div class="sub">Ref: <b>${escHtml(ref)}</b>  |  Name: <b>${escHtml(name)}</b>  |  CNIC: <b>${escHtml(cnic)}</b></div>
-    </div>
-    <div style="padding:12px 12px 0">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Name</th><th>Father</th><th>Mobile</th><th style="text-align:right">Sale</th><th style="text-align:right">Cash received</th><th style="text-align:right">Dues</th>
-        </tr></thead>
-        <tbody>${rows || `<tr><td colspan="7">—</td></tr>`}</tbody>
-      </table>
-    </div>
-    <div class="ft">TOTAL DUES: ${escHtml(formatRs(totalDues))}</div>
-  </div>
-</body></html>`
-
-  printFullDocument(doc)
-}
-
-function printGeneralDuesDetail(lines: GeneralEntryLine[]) {
-  const usable = lines.filter((r) => r.kind === 'dues' && generalDuesRemaining(r) > 0)
-  if (!usable.length) return
-  const sorted = usable
-    .slice()
-    .sort((a, b) => (a.entryDate || '').localeCompare(b.entryDate || '') || a.id.localeCompare(b.id))
-  const label = sorted[0] ? generalEntryDisplayName(sorted[0]) : 'General'
-  const total = sorted.reduce((s, r) => s + generalDuesRemaining(r), 0)
-
-  const rows = sorted
-    .map((r, i) => {
-      const rem = generalDuesRemaining(r)
-      return `<tr>
-        <td>${i + 1}</td>
-        <td>${escHtml(r.entryDate || '—')}</td>
-        <td>${escHtml(r.description.trim() || generalEntryDisplayName(r))}</td>
-        <td style="text-align:right">${escHtml(formatRs(r.amount))}</td>
-        <td style="text-align:right">${escHtml(formatRs(rem))}</td>
-        <td>${rem > 0 ? '☐ Active' : '☑ Paid'}</td>
-      </tr>`
-    })
-    .join('')
-
-  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-<title>${escAttr(`General dues — ${label}`)}</title>
-<style>
-  :root{--bg:#0b1224;--card:#0f172a;--line:rgba(148,163,184,.18);--mut:rgba(226,232,240,.78);--txt:#f8fafc;--acc:#fbbf24;--red:#dc2626;}
-  *{box-sizing:border-box;}
-  body{margin:0;padding:18px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#0a1020;color:var(--txt);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .sheet{max-width:960px;margin:0 auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:linear-gradient(165deg,#111a30 0%,#0b1224 45%,#0a1628 100%);box-shadow:0 22px 60px rgba(0,0,0,.45);}
-  .hd{padding:16px 16px 12px;border-bottom:1px solid var(--line);background:rgba(15,23,42,.95);}
-  .brand{font-weight:1000;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-size:13px;}
-  .addr{margin-top:6px;color:rgba(226,232,240,.78);font-weight:700;font-size:12px;line-height:1.35;}
-  .title{margin-top:6px;font-size:18px;font-weight:1000;}
-  .sub{margin-top:8px;color:rgba(248,250,252,.92);font-weight:900;font-size:12px;line-height:1.45;}
-  table{width:100%;border-collapse:collapse;font-size:12px;}
-  thead th{position:sticky;top:0;background:#0f172a;color:rgba(226,232,240,.78);text-transform:uppercase;letter-spacing:.06em;font-size:10px;font-weight:1000;padding:10px;border-bottom:1px solid var(--line);}
-  tbody td{padding:10px;border-bottom:1px solid rgba(148,163,184,.12);color:rgba(248,250,252,.92);font-weight:700;}
-  tbody tr:nth-child(even) td{background:rgba(255,255,255,.02);}
-  .ft{padding:12px 16px;background:linear-gradient(90deg, rgba(185, 28, 28, 0.95), rgba(220, 38, 38, 0.88));font-weight:1000;}
-  @media print{body{padding:0;background:#0a1020}.sheet{box-shadow:none;border-radius:0;max-width:none} thead th{position:static}}
-</style>
-</head><body>
-  <div class="sheet">
-    <div class="hd">
-      <div class="brand">Hayat & Brothers</div>
-      <div class="title">General Dues Detail</div>
-      <div class="sub">Name: <b>${escHtml(label)}</b></div>
-    </div>
-    <div style="padding:12px 12px 0">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Date</th><th>Details</th><th style="text-align:right">Amount</th><th style="text-align:right">Remaining</th><th>Status</th>
-        </tr></thead>
-        <tbody>${rows || `<tr><td colspan="6">—</td></tr>`}</tbody>
-      </table>
-    </div>
-    <div class="ft">TOTAL DUES: ${escHtml(formatRs(total))} (${sorted.length} entries)</div>
-  </div>
-</body></html>`
-
-  printFullDocument(doc)
-}
-
 function mergeEntriesById(updated: Entry[]) {
   const map = new Map(updated.map((e) => [e.id, e]))
   const all = loadEntries().map((e) => map.get(e.id) ?? e)
@@ -4319,6 +4185,7 @@ type DuesPaymentLog = {
   groupKey: string
   amount: number
   paidAt: string
+  note?: string
 }
 
 const DUES_PAYMENTS_KEY = 'esysoft.duesPayments.v1'
@@ -4437,16 +4304,489 @@ function restoreFromBackupText(text: string): { ok: boolean; message: string } {
   }
 }
 
-function appendDuesPaymentLog(kind: 'app' | 'weapon' | 'general', groupKey: string, amount: number) {
+function appendDuesPaymentLog(
+  kind: 'app' | 'weapon' | 'general',
+  groupKey: string,
+  amount: number,
+  note?: string,
+) {
   const all = loadDuesPaymentLogs()
+  const trimmed = (note ?? '').trim()
   all.push({
     id: cryptoId(),
     kind,
     groupKey,
     amount,
     paidAt: new Date().toISOString(),
+    ...(trimmed ? { note: trimmed } : {}),
   })
   saveDuesPaymentLogs(all)
+}
+
+
+function duesPaymentLogDateIso(paidAt: string): string {
+  const d = new Date(paidAt)
+  if (!Number.isNaN(d.getTime())) {
+    const p = (x: number) => String(x).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  }
+  return (paidAt || '').slice(0, 10)
+}
+
+function duesPaymentLogInRange(log: DuesPaymentLog, fromIso: string, toIso: string): boolean {
+  const d = duesPaymentLogDateIso(log.paidAt)
+  if (!fromIso || !toIso) return true
+  return d >= fromIso && d <= toIso
+}
+
+async function promptDateRangeModal(opts: {
+  title: string
+  subtitle?: string
+}): Promise<{ fromIso: string; toIso: string } | null> {
+  document.querySelector('.confirm-overlay')?.remove()
+  const today = isoToday()
+  const d = new Date()
+  const monthStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  const overlay = makeEl('div', { className: 'confirm-overlay', attrs: { role: 'dialog', 'aria-modal': 'true' } })
+  const card = makeEl('div', { className: 'confirm-card' })
+  overlay.append(card)
+  card.innerHTML = `
+    <div class="confirm-hd"><div class="confirm-title">${escHtml(opts.title)}</div></div>
+    <div class="confirm-bd">
+      ${opts.subtitle ? `<div class="confirm-msg">${escHtml(opts.subtitle)}</div>` : ''}
+      <div class="dues-print-range-fields">
+        <label class="dues-print-range-lbl"><span>From</span><input type="date" class="in dues-print-from" value="${escAttr(monthStart)}" /></label>
+        <label class="dues-print-range-lbl"><span>To</span><input type="date" class="in dues-print-to" value="${escAttr(today)}" /></label>
+      </div>
+      <div class="dues-print-range-err" role="alert"></div>
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost confirm-cancel">${escHtml('Cancel')}</button>
+      <button type="button" class="btn primary confirm-ok">${escHtml('Print')}</button>
+    </div>`
+  document.body.append(overlay)
+  queueMicrotask(() => overlay.classList.add('is-open'))
+  const fromIn = card.querySelector<HTMLInputElement>('.dues-print-from')
+  const toIn = card.querySelector<HTMLInputElement>('.dues-print-to')
+  const errEl = card.querySelector<HTMLDivElement>('.dues-print-range-err')
+  const okBtn = card.querySelector<HTMLButtonElement>('.confirm-ok')
+  const cancelBtn = card.querySelector<HTMLButtonElement>('.confirm-cancel')
+  const tearDown = async () => {
+    overlay.classList.remove('is-open')
+    await sleepMs(140)
+    overlay.remove()
+  }
+  return await new Promise<{ fromIso: string; toIso: string } | null>((resolve) => {
+    const finish = async (result: { fromIso: string; toIso: string } | null) => {
+      window.removeEventListener('keydown', onKey)
+      await tearDown()
+      resolve(result)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void finish(null)
+    }
+    const tryPrint = () => {
+      const fromIso = (fromIn?.value ?? '').trim()
+      const toIso = (toIn?.value ?? '').trim()
+      if (!fromIso || !toIso) {
+        if (errEl) errEl.textContent = 'From aur To dono dates select karein.'
+        return
+      }
+      if (fromIso > toIso) {
+        if (errEl) errEl.textContent = 'From date, To se zyada nahi ho sakti.'
+        return
+      }
+      if (errEl) errEl.textContent = ''
+      void finish({ fromIso, toIso })
+    }
+    window.addEventListener('keydown', onKey)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) void finish(null)
+    })
+    okBtn?.addEventListener('click', tryPrint)
+    cancelBtn?.addEventListener('click', () => void finish(null))
+    queueMicrotask(() => fromIn?.focus())
+  })
+}
+
+type ClientDuesLedgerRow = {
+  sortAt: string
+  date: string
+  nameRef: string
+  note: string
+  /** Customer par charge / qardan (balance barhta hai) */
+  debit: number | null
+  /** Wasool / payment (balance kam hota hai) */
+  credit: number | null
+  /** Application / weapon allot / general — client detail print */
+  srcTag?: 'appl' | 'gen' | 'wepl'
+}
+
+function stmtNameRef(name: string, ref: string): string {
+  const n = name.trim()
+  const r = ref.trim()
+  if (n && r) return `${n} / ${r}`
+  return n || r || '—'
+}
+
+function entryDateInRange(entryDate: string, fromIso: string, toIso: string): boolean {
+  const d = (entryDate || '').trim()
+  if (!d) return false
+  return d >= fromIso && d <= toIso
+}
+
+function buildClientDuesLedgerRows(opts: {
+  kind: 'app' | 'weapon' | 'general'
+  groupKey: string
+  clientName: string
+  clientReference: string
+  fromIso: string
+  toIso: string
+}): ClientDuesLedgerRow[] {
+  const rows: ClientDuesLedgerRow[] = []
+  const clientName = opts.clientName.trim() || '—'
+  const clientRef = opts.clientReference.trim() || '—'
+  const defaultNameRef = stmtNameRef(clientName, clientRef)
+  const noteLine = (parts: string[]) => parts.map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
+  if (opts.kind === 'general') {
+    for (const r of loadGeneralEntries()) {
+      if (r.kind !== 'dues' || generalEntryGroupKey(r) !== opts.groupKey) continue
+      if (!entryDateInRange(r.entryDate, opts.fromIso, opts.toIso)) continue
+      rows.push({
+        sortAt: `${r.entryDate}T00:00:00`,
+        date: formatDateDisplay(r.entryDate),
+        nameRef: stmtNameRef(generalEntryDisplayName(r), clientRef),
+        note: r.description.trim() || '—',
+        debit: r.amount,
+        credit: null,
+      })
+    }
+  } else if (opts.kind === 'app') {
+    for (const e of loadEntries()) {
+      if (appDuesGroupKey(e) !== opts.groupKey) continue
+      if (!entryDateInRange(e.entryDate, opts.fromIso, opts.toIso)) continue
+      const noteParts = [e.trackingId, e.weaponNumber, e.category].map((x) => x.trim()).filter(Boolean)
+      rows.push({
+        sortAt: `${e.entryDate}T00:00:00`,
+        date: formatDateDisplay(e.entryDate),
+        nameRef: stmtNameRef((e.name || '').trim() || clientName, e.reference.trim() || e.category.trim() || clientRef),
+        note: noteLine(noteParts),
+        debit: e.salePrice,
+        credit: null,
+      })
+    }
+  } else {
+    for (const l of loadWeaponAllotLines()) {
+      const k = (l.client || '').trim() || '(No client)'
+      if (k !== opts.groupKey) continue
+      if (!entryDateInRange(l.entryDate, opts.fromIso, opts.toIso)) continue
+      const wn = (l.weaponNumber || '').trim()
+      rows.push({
+        sortAt: `${l.entryDate}T00:00:00`,
+        date: formatDateDisplay(l.entryDate),
+        nameRef: stmtNameRef(k, wn || clientRef),
+        note: wn || '—',
+        debit: l.salePrice,
+        credit: null,
+      })
+    }
+  }
+  for (const log of loadDuesPaymentLogs()) {
+    if (log.kind !== opts.kind || log.groupKey !== opts.groupKey) continue
+    if (!duesPaymentLogInRange(log, opts.fromIso, opts.toIso)) continue
+    const payNote = (log.note ?? '').trim() || 'Wasool'
+    rows.push({
+      sortAt: log.paidAt,
+      date: formatDateDisplay(duesPaymentLogDateIso(log.paidAt)),
+      nameRef: defaultNameRef,
+      note: payNote,
+      debit: null,
+      credit: log.amount,
+    })
+  }
+  rows.sort((a, b) => a.sortAt.localeCompare(b.sortAt) || a.note.localeCompare(b.note))
+  return rows
+}
+
+function clientDetailSrcTag(kind: 'app' | 'weapon' | 'general'): 'appl' | 'gen' | 'wepl' {
+  if (kind === 'app') return 'appl'
+  if (kind === 'general') return 'gen'
+  return 'wepl'
+}
+
+function clientDetailGroupMeta(h: ClientDetailHit): {
+  kind: 'app' | 'weapon' | 'general'
+  groupKey: string
+  nameRef: string
+} {
+  if (h.kind === 'app') {
+    const e = h.entry
+    const ref = e.reference.trim() || e.cnic.trim() || e.category.trim() || '—'
+    return {
+      kind: 'app',
+      groupKey: appDuesGroupKey(e),
+      nameRef: stmtNameRef((e.name || '').trim() || '—', ref),
+    }
+  }
+  if (h.kind === 'weapon') {
+    const l = h.line
+    const k = (l.client || '').trim() || '(No client)'
+    const wn = (l.weaponNumber || '').trim()
+    return { kind: 'weapon', groupKey: k, nameRef: stmtNameRef(k, wn || '—') }
+  }
+  const r = h.row
+  return {
+    kind: 'general',
+    groupKey: generalEntryGroupKey(r),
+    nameRef: stmtNameRef(generalEntryDisplayName(r), (r.description || '').trim() || '—'),
+  }
+}
+
+function buildClientSearchLedgerRows(hits: ClientDetailHit[], fromIso: string, toIso: string): ClientDuesLedgerRow[] {
+  const rows: ClientDuesLedgerRow[] = []
+  const noteLine = (parts: string[]) => parts.map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
+  const groups = new Map<string, { kind: 'app' | 'weapon' | 'general'; defaultNameRef: string }>()
+
+  for (const h of hits) {
+    const meta = clientDetailGroupMeta(h)
+    const mapKey = `${meta.kind}:${meta.groupKey}`
+    if (!groups.has(mapKey)) groups.set(mapKey, { kind: meta.kind, defaultNameRef: meta.nameRef })
+
+    if (h.kind === 'app') {
+      const e = h.entry
+      if (!entryDateInRange(e.entryDate, fromIso, toIso)) continue
+      const noteParts = [e.trackingId, e.weaponNumber, e.category].map((x) => x.trim()).filter(Boolean)
+      rows.push({
+        sortAt: `${e.entryDate}T00:00:00`,
+        date: formatDateDisplay(e.entryDate),
+        nameRef: meta.nameRef,
+        note: noteLine(noteParts),
+        debit: e.salePrice,
+        credit: null,
+        srcTag: 'appl',
+      })
+    } else if (h.kind === 'weapon') {
+      const l = h.line
+      if (!entryDateInRange(l.entryDate, fromIso, toIso)) continue
+      const wn = (l.weaponNumber || '').trim()
+      rows.push({
+        sortAt: `${l.entryDate}T00:00:00`,
+        date: formatDateDisplay(l.entryDate),
+        nameRef: meta.nameRef,
+        note: wn || '—',
+        debit: l.salePrice,
+        credit: null,
+        srcTag: 'wepl',
+      })
+    } else {
+      const r = h.row
+      if (!entryDateInRange(r.entryDate, fromIso, toIso)) continue
+      rows.push({
+        sortAt: `${r.entryDate}T00:00:00`,
+        date: formatDateDisplay(r.entryDate),
+        nameRef: meta.nameRef,
+        note: r.description.trim() || '—',
+        debit: r.amount,
+        credit: null,
+        srcTag: 'gen',
+      })
+    }
+  }
+
+  for (const log of loadDuesPaymentLogs()) {
+    const mapKey = `${log.kind}:${log.groupKey}`
+    const g = groups.get(mapKey)
+    if (!g) continue
+    if (!duesPaymentLogInRange(log, fromIso, toIso)) continue
+    const payNote = (log.note ?? '').trim() || 'Wasool'
+    rows.push({
+      sortAt: log.paidAt,
+      date: formatDateDisplay(duesPaymentLogDateIso(log.paidAt)),
+      nameRef: g.defaultNameRef,
+      note: payNote,
+      debit: null,
+      credit: log.amount,
+      srcTag: clientDetailSrcTag(log.kind),
+    })
+  }
+
+  rows.sort((a, b) => a.sortAt.localeCompare(b.sortAt) || a.note.localeCompare(b.note))
+  return rows
+}
+
+function printClientLedgerDocument(opts: {
+  title: string
+  subTitle: string
+  clientLine: string
+  ledger: ClientDuesLedgerRow[]
+  showSrcCol: boolean
+}) {
+  const esc = escHtml
+  const now = new Date()
+  const sumDebit = opts.ledger.reduce((s, r) => s + (r.debit != null ? r.debit : 0), 0)
+  const sumCredit = opts.ledger.reduce((s, r) => s + (r.credit != null ? r.credit : 0), 0)
+  const stmtBalance = Math.round((sumDebit - sumCredit) * 100) / 100
+  let idx = 0
+  const srcTh = opts.showSrcCol ? `<th class="col-src">Cat</th>` : ''
+  const srcCol = opts.showSrcCol ? `<col style="width:5%" />` : ''
+  const colspan = opts.showSrcCol ? 7 : 6
+  const trs = opts.ledger
+    .map((r) => {
+      idx += 1
+      const srcTd = opts.showSrcCol
+        ? `<td class="col-src">${esc(r.srcTag ?? '—')}</td>`
+        : ''
+      return `<tr>
+        <td class="col-srl">${idx}</td>
+        ${srcTd}
+        <td class="col-date">${esc(r.date)}</td>
+        <td class="col-nameref">${esc(r.nameRef)}</td>
+        <td class="col-note">${esc(r.note)}</td>
+        <td class="num">${esc(stmtPrintDebitCredit(r.debit))}</td>
+        <td class="num">${esc(stmtPrintDebitCredit(r.credit))}</td>
+      </tr>`
+    })
+    .join('')
+  const printedWhen = `${formatHeaderDate(now)} | ${formatHeaderTime(now)}`
+  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<title>${escAttr(opts.title)}</title>
+<style>${PRINT_CLIENT_LEDGER_CSS}</style>
+</head><body>
+<div class="page">
+  <div class="hdr">
+    <div class="shop">
+      <div class="name">${esc(PRINT_INVOICE_SHOP.name)}</div>
+      <div class="line">${esc(PRINT_INVOICE_SHOP.phone)}</div>
+    </div>
+    <div class="stmt-hd">
+      <div class="title">STATEMENT</div>
+      <div class="sub">${esc(opts.subTitle)}</div>
+      <div class="when">${esc(printedWhen)}</div>
+    </div>
+  </div>
+  <hr class="rule" />
+  <div class="client-line">${esc(opts.clientLine)}</div>
+  <div class="stmt-table-wrap">
+  <table class="stmt-table">
+    <colgroup>
+      <col style="width:5%" />${srcCol}<col style="width:10%" /><col style="width:20%" /><col style="width:24%" />
+      <col style="width:14%" /><col style="width:14%" />
+    </colgroup>
+    <thead><tr>
+      <th class="col-srl">Srl No</th>${srcTh}<th class="col-date">Date</th><th class="col-nameref">Name / Reference</th><th class="col-note">Note</th>
+      <th class="num">Debit</th><th class="num">Credit</th>
+    </tr></thead>
+    <tbody>${trs || `<tr><td colspan="${colspan}">—</td></tr>`}</tbody>
+  </table>
+  </div>
+  <div class="fin-wrap">
+    <div class="fin-box">
+      <div class="fin-title">SUMMARY</div>
+      <div class="fin-row"><span>Total Debit</span><span>${esc(stmtPrintMoney(sumDebit))}</span></div>
+      <div class="fin-row"><span>Total Credit</span><span>${esc(stmtPrintMoney(sumCredit))}</span></div>
+      <div class="fin-row net"><span>Balance (baqi)</span><span>${esc(stmtPrintMoney(stmtBalance))}</span></div>
+    </div>
+  </div>
+  <div class="foot"><div>*** This is a Computer Generated Print ***</div><div class="p2">POWERED BY GUL CORPORATION LLC</div></div>
+</div></body></html>`
+  printFullDocument(doc)
+}
+
+function stmtPrintMoney(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.001) return 'RS 0.00'
+  return formatInvoiceRupee(n)
+}
+
+/** Debit/Credit cell: khali jab amount na ho */
+function stmtPrintDebitCredit(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.001) return '—'
+  return formatInvoiceRupee(n)
+}
+
+const PRINT_CLIENT_LEDGER_CSS = `
+  @page { size: A4 portrait; margin: 10mm; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;font-family:Arial,'Segoe UI',Helvetica,sans-serif;font-size:10px;color:#000;background:#fff;}
+  .page{width:100%;max-width:100%;margin:0;padding:0;}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;}
+  .shop{flex:1;min-width:0;}
+  .shop .name{font-size:16px;font-weight:700;line-height:1.15;}
+  .shop .line{margin-top:3px;font-size:10px;}
+  .stmt-hd{flex:0 0 auto;text-align:right;max-width:48%;}
+  .stmt-hd .title{font-size:17px;font-weight:700;}
+  .stmt-hd .sub{margin-top:2px;font-size:10px;font-weight:700;}
+  .stmt-hd .when{margin-top:2px;font-size:9px;line-height:1.3;}
+  .rule{border:none;border-top:3px solid #000;margin:10px 0 12px;width:100%;}
+  .client-line{margin:0 0 10px;font-size:10px;font-weight:700;width:100%;}
+  .stmt-table-wrap{width:100%;max-width:100%;overflow:hidden;}
+  .stmt-table{width:100%;max-width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;}
+  .stmt-table th,.stmt-table td{border:1px solid #000;padding:4px 5px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;}
+  .stmt-table thead th{background:#f2f2f2;font-weight:700;font-size:9px;line-height:1.2;}
+  .stmt-table th.num,.stmt-table td.num{text-align:right;font-size:9px;padding:4px 3px;white-space:normal;word-break:break-word;}
+  .stmt-table .col-srl{text-align:center;white-space:nowrap;}
+  .stmt-table .col-src{text-align:center;white-space:nowrap;font-weight:700;text-transform:lowercase;}
+  .stmt-table .col-date{white-space:nowrap;font-size:9px;}
+  .stmt-table .col-nameref,.stmt-table .col-note{word-break:break-word;overflow-wrap:break-word;line-height:1.25;}
+  .fin-wrap{display:flex;justify-content:flex-end;margin-top:20px;width:100%;}
+  .fin-box{width:240px;max-width:42%;border:2px solid #000;flex-shrink:0;}
+  .fin-title{text-align:center;font-weight:700;font-size:10px;padding:6px 8px;border-bottom:1px solid #000;}
+  .fin-row{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-bottom:1px solid #bdbdbd;font-weight:700;font-size:10px;}
+  .fin-row:last-child{border-bottom:none;}
+  .fin-row.net{color:#15803d;font-size:11px;padding:7px 8px;}
+  .foot{margin-top:36px;text-align:center;font-size:9px;line-height:1.5;width:100%;}
+  .foot .p2{margin-top:4px;font-weight:700;}
+  @media print{
+    html,body{width:100%;overflow:visible;}
+    .page{width:100%;}
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+`
+
+function printDuesCollectionStatement(opts: {
+  kind: 'app' | 'weapon' | 'general'
+  groupKey: string
+  clientLabel: string
+  clientReference: string
+  fromIso: string
+  toIso: string
+}) {
+  const kindLabel = opts.kind === 'app' ? 'Application' : opts.kind === 'weapon' ? 'Weapon' : 'General'
+  const rangeLabel = `${opts.fromIso} → ${opts.toIso}`
+  const ledger = buildClientDuesLedgerRows({
+    kind: opts.kind,
+    groupKey: opts.groupKey,
+    clientName: opts.clientLabel,
+    clientReference: opts.clientReference,
+    fromIso: opts.fromIso,
+    toIso: opts.toIso,
+  })
+  printClientLedgerDocument({
+    title: `Statement — ${opts.clientLabel}`,
+    subTitle: 'CUSTOMER STATEMENT',
+    clientLine: `Name: ${opts.clientLabel} | Reference: ${opts.clientReference.trim() || '—'} | Period: ${rangeLabel} | ${kindLabel}`,
+    ledger,
+    showSrcCol: false,
+  })
+}
+
+function duesModalCollectFooterHtml(withPrint: boolean): string {
+  const printBtn = withPrint
+    ? `<button type="button" class="btn primary tool-purple dues-print-btn">${ICON_RECEIPT}<span>Custom print</span></button>`
+    : ''
+  return `
+      <div class="dues-modal-actions">
+        <label class="dues-collect-lbl">Collect Amount (Rs.):</label>
+        <input type="text" class="in dues-collect-in" inputmode="decimal" />
+        <span class="dues-collect-max"></span>
+        <button type="button" class="btn primary dues-collect-btn">✓ Collect Now</button>
+      </div>
+      <div class="dues-modal-actions dues-modal-actions-note">
+        <label class="dues-collect-lbl">Note (wasool detail):</label>
+        <input type="text" class="in dues-collect-note" placeholder="Cash kis se wasool hovi hai..." />
+        ${printBtn}
+        <button type="button" class="btn ghost dues-close-btn">✕ Close</button>
+      </div>
+      <div class="dues-modal-msg" role="status"></div>`
 }
 
 function formatPaidDateTime(iso: string) {
@@ -4465,6 +4805,10 @@ function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon' | 
     return
   }
   const last = logs[0]
+  const noteLine = (n?: string) => {
+    const t = (n ?? '').trim()
+    return t ? `<div class="dues-payhist-note">${escHtml(t)}</div>` : ''
+  }
   const older = logs.slice(1, 9)
   const recent =
     older.length === 0
@@ -4472,13 +4816,14 @@ function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon' | 
       : `<div class="dues-payhist-listwrap"><div class="dues-payhist-listhdr">Purane</div><ol class="dues-payhist-ol">${older
           .map(
             (x) =>
-              `<li><span class="dues-payhist-amt">${formatRs(x.amount)}</span> <span class="dues-payhist-when">${formatPaidDateTime(x.paidAt)}</span></li>`,
+              `<li><span class="dues-payhist-amt">${formatRs(x.amount)}</span> <span class="dues-payhist-when">${formatPaidDateTime(x.paidAt)}</span>${(x.note ?? '').trim() ? ` <span class="dues-payhist-note-inline">${escHtml((x.note ?? '').trim())}</span>` : ''}</li>`,
           )
           .join('')}</ol></div>`
   el.innerHTML = `
     <div class="dues-payhist-highlight">
       <div class="dues-payhist-lastamt">${formatRs(last.amount)}</div>
       <div class="dues-payhist-lastwhen">${formatPaidDateTime(last.paidAt)}</div>
+      ${noteLine(last.note)}
     </div>
     ${recent}
   `
@@ -4558,19 +4903,12 @@ function openDuesDetailModal(opts: {
         </div>
       </div>
       <div class="dues-modal-total">TOTAL DUES: ${formatRs(total)} (${entries.length} entries)</div>
-      <div class="dues-modal-actions">
-        <label class="dues-collect-lbl">Collect Amount (Rs.):</label>
-        <input type="text" class="in dues-collect-in" inputmode="decimal" />
-        <span class="dues-collect-max">Max: ${formatRs(total)}</span>
-        <button type="button" class="btn primary dues-collect-btn">✓ Collect Now</button>
-        <button type="button" class="btn primary tool-purple dues-print-btn">${ICON_RECEIPT}<span>Print detail</span></button>
-        <button type="button" class="btn ghost dues-close-btn">✕ Close</button>
-      </div>
-      <div class="dues-modal-msg" role="status"></div>
+      ${duesModalCollectFooterHtml(true)}
     `
 
     const tbody = modal.querySelector<HTMLTableSectionElement>('.dues-modal-tbody')
     const collectIn = modal.querySelector<HTMLInputElement>('.dues-collect-in')
+    const collectNote = modal.querySelector<HTMLInputElement>('.dues-collect-note')
     const collectBtn = modal.querySelector<HTMLButtonElement>('.dues-collect-btn')
     const printBtn = modal.querySelector<HTMLButtonElement>('.dues-print-btn')
     const closeBtn = modal.querySelector<HTMLButtonElement>('.dues-close-btn')
@@ -4579,6 +4917,7 @@ function openDuesDetailModal(opts: {
     const payHistBody = modal.querySelector<HTMLDivElement>('.dues-modal-payhist-body')
 
     const maxEl = modal.querySelector<HTMLSpanElement>('.dues-collect-max')
+    if (maxEl) maxEl.textContent = `Max: ${formatRs(total)}`
     const renderRows = () => {
       entries = loadAppDuesGroup(opts.groupKey)
       const t = entries.reduce((s, e) => s + entryLineDues(e), 0)
@@ -4607,6 +4946,7 @@ function openDuesDetailModal(opts: {
         })
         .join('')
       if (collectIn) collectIn.value = ''
+      if (collectNote) collectNote.value = ''
       if (msg) msg.textContent = ''
     }
     renderRows()
@@ -4617,10 +4957,22 @@ function openDuesDetailModal(opts: {
       collectBtn?.click()
     })
 
-    printBtn?.addEventListener('click', () => {
-      // Print current group (reference grouping) without cost price
-      entries = loadAppDuesGroup(opts.groupKey)
-      printDuesReferenceDetail(entries)
+    printBtn?.addEventListener('click', async () => {
+      const cur = loadAppDuesGroup(opts.groupKey)
+      const f = cur[0] ?? first
+      const range = await promptDateRangeModal({
+        title: 'Custom print',
+        subtitle: 'From — To date range select karein.',
+      })
+      if (!range) return
+      printDuesCollectionStatement({
+        kind: 'app',
+        groupKey: opts.groupKey,
+        clientLabel: (f.name || '').trim() || '—',
+        clientReference: (f.reference || '').trim() || (f.cnic || '').trim() || '—',
+        fromIso: range.fromIso,
+        toIso: range.toIso,
+      })
     })
 
     collectBtn?.addEventListener('click', () => {
@@ -4636,7 +4988,7 @@ function openDuesDetailModal(opts: {
       }
       const merged = applyCollectionToEntries(entries, amt)
       mergeEntriesById(merged)
-      appendDuesPaymentLog('app', opts.groupKey, amt)
+      appendDuesPaymentLog('app', opts.groupKey, amt, collectNote?.value ?? '')
       if (msg) msg.textContent = 'Saved.'
       opts.onSaved()
       renderRows()
@@ -4690,19 +5042,14 @@ function openDuesDetailModal(opts: {
         </div>
       </div>
       <div class="dues-modal-total">TOTAL DUES: ${formatRs(total)} (${lines.length} entries)</div>
-      <div class="dues-modal-actions">
-        <label class="dues-collect-lbl">Collect Amount (Rs.):</label>
-        <input type="text" class="in dues-collect-in" inputmode="decimal" />
-        <span class="dues-collect-max">Max: ${formatRs(total)}</span>
-        <button type="button" class="btn primary dues-collect-btn">✓ Collect Now</button>
-        <button type="button" class="btn ghost dues-close-btn">✕ Close</button>
-      </div>
-      <div class="dues-modal-msg" role="status"></div>
+      ${duesModalCollectFooterHtml(true)}
     `
 
     const tbody = modal.querySelector<HTMLTableSectionElement>('.dues-modal-tbody')
     const collectIn = modal.querySelector<HTMLInputElement>('.dues-collect-in')
+    const collectNote = modal.querySelector<HTMLInputElement>('.dues-collect-note')
     const collectBtn = modal.querySelector<HTMLButtonElement>('.dues-collect-btn')
+    const printBtn = modal.querySelector<HTMLButtonElement>('.dues-print-btn')
     const closeBtn = modal.querySelector<HTMLButtonElement>('.dues-close-btn')
     const totalEl = modal.querySelector<HTMLDivElement>('.dues-modal-total')
     const msg = modal.querySelector<HTMLDivElement>('.dues-modal-msg')
@@ -4735,9 +5082,26 @@ function openDuesDetailModal(opts: {
         })
         .join('')
       if (collectIn) collectIn.value = ''
+      if (collectNote) collectNote.value = ''
       if (msg) msg.textContent = ''
     }
     renderRows()
+
+    printBtn?.addEventListener('click', async () => {
+      const range = await promptDateRangeModal({
+        title: 'Custom print',
+        subtitle: 'From — To date range select karein.',
+      })
+      if (!range) return
+      printDuesCollectionStatement({
+        kind: 'weapon',
+        groupKey: opts.groupKey,
+        clientLabel: clientLabel,
+        clientReference: opts.groupKey,
+        fromIso: range.fromIso,
+        toIso: range.toIso,
+      })
+    })
 
     collectBtn?.addEventListener('click', () => {
       const amt = parseNumOrNull(collectIn?.value ?? '')
@@ -4752,7 +5116,7 @@ function openDuesDetailModal(opts: {
       }
       const merged = applyCollectionToWeaponLines(lines, amt)
       mergeWeaponLinesById(merged)
-      appendDuesPaymentLog('weapon', opts.groupKey, amt)
+      appendDuesPaymentLog('weapon', opts.groupKey, amt, collectNote?.value ?? '')
       if (msg) msg.textContent = 'Saved.'
       opts.onSaved()
       renderRows()
@@ -4812,19 +5176,12 @@ function openDuesDetailModal(opts: {
         </div>
       </div>
       <div class="dues-modal-total">TOTAL DUES: ${formatRs(total)} (${lines.length} entries)</div>
-      <div class="dues-modal-actions">
-        <label class="dues-collect-lbl">Collect Amount (Rs.):</label>
-        <input type="text" class="in dues-collect-in" inputmode="decimal" />
-        <span class="dues-collect-max">Max: ${formatRs(total)}</span>
-        <button type="button" class="btn primary dues-collect-btn">✓ Collect Now</button>
-        <button type="button" class="btn primary tool-purple dues-print-btn">${ICON_RECEIPT}<span>Print detail</span></button>
-        <button type="button" class="btn ghost dues-close-btn">✕ Close</button>
-      </div>
-      <div class="dues-modal-msg" role="status"></div>
+      ${duesModalCollectFooterHtml(true)}
     `
 
     const tbody = modal.querySelector<HTMLTableSectionElement>('.dues-modal-tbody')
     const collectIn = modal.querySelector<HTMLInputElement>('.dues-collect-in')
+    const collectNote = modal.querySelector<HTMLInputElement>('.dues-collect-note')
     const collectBtn = modal.querySelector<HTMLButtonElement>('.dues-collect-btn')
     const printBtn = modal.querySelector<HTMLButtonElement>('.dues-print-btn')
     const closeBtn = modal.querySelector<HTMLButtonElement>('.dues-close-btn')
@@ -4856,13 +5213,28 @@ function openDuesDetailModal(opts: {
           })
           .join('')
       if (collectIn) collectIn.value = ''
+      if (collectNote) collectNote.value = ''
       if (msg) msg.textContent = ''
     }
     renderRows()
 
-    printBtn?.addEventListener('click', () => {
+    printBtn?.addEventListener('click', async () => {
       lines = loadGroup()
-      printGeneralDuesDetail(lines)
+      const first = lines[0]
+      const range = await promptDateRangeModal({
+        title: 'Custom print',
+        subtitle: 'From — To date range select karein.',
+      })
+      if (!range) return
+      const ref = (first?.description ?? '').trim() || groupKey
+      printDuesCollectionStatement({
+        kind: 'general',
+        groupKey,
+        clientLabel: label,
+        clientReference: ref,
+        fromIso: range.fromIso,
+        toIso: range.toIso,
+      })
     })
 
     collectBtn?.addEventListener('click', () => {
@@ -4878,7 +5250,7 @@ function openDuesDetailModal(opts: {
       }
       const updated = applyCollectionToGeneral(lines, amt)
       mergeGeneralEntriesById(updated)
-      appendDuesPaymentLog('general', groupKey, amt)
+      appendDuesPaymentLog('general', groupKey, amt, collectNote?.value ?? '')
       if (msg) msg.textContent = 'Saved.'
       opts.onSaved()
       renderRows()
@@ -5583,11 +5955,32 @@ function buildStatementRows(
   return out
 }
 
-function reportModeTitle(mode: 'daily' | 'monthly' | 'custom' | 'full'): string {
-  if (mode === 'full') return 'FULL STATEMENT'
-  if (mode === 'daily') return 'DAILY'
-  if (mode === 'monthly') return 'MONTHLY'
-  return 'CUSTOM RANGE'
+function reportModeSubTitle(mode: 'daily' | 'monthly' | 'custom' | 'full'): string {
+  if (mode === 'daily') return 'DAILY REPORT'
+  if (mode === 'monthly') return 'MONTHLY REPORT'
+  if (mode === 'custom') return 'CUSTOM REPORT'
+  return 'FULL REPORT'
+}
+
+function stmtRowDescription(r: StmtRow): string {
+  const type = r.kind === 'app' ? 'Application' : r.kind === 'weapon' ? 'Weapon allot' : 'Expense'
+  const parts = [type, r.name, r.catOrRef !== '—' ? r.catOrRef : ''].map((x) => x.trim()).filter(Boolean)
+  return parts.join(' · ') || '—'
+}
+
+function stmtRowPaid(r: StmtRow): number | null {
+  if (r.sale == null) return null
+  return Math.round(Math.max(0, r.sale - (r.dues || 0)) * 100) / 100
+}
+
+function reportPeriodLabel(mode: 'daily' | 'monthly' | 'custom' | 'full', fromIso: string, toIso: string): string {
+  const f = (fromIso || '').trim()
+  const t = (toIso || '').trim()
+  if (mode === 'custom' && (f || t)) return `Period: ${f || '—'} → ${t || '—'}`
+  if (mode === 'daily' && f) return `Period: ${f}`
+  if (mode === 'monthly' && f) return `Period: ${f.slice(0, 7)}`
+  if (mode === 'full') return 'Period: All records'
+  return 'Period: —'
 }
 
 function printAccountStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fromIso: string, toIso: string) {
@@ -5595,196 +5988,121 @@ function printAccountStatement(mode: 'daily' | 'monthly' | 'custom' | 'full', fr
   const totalSale = rows.reduce((s, r) => s + (r.kind !== 'expense' && r.sale != null ? r.sale : 0), 0)
   const totalCost = rows.reduce((s, r) => s + (r.kind !== 'expense' && r.cost != null ? r.cost : 0), 0)
   const totalProfit = rows.reduce((s, r) => s + (r.profit != null ? r.profit : 0), 0)
-  const totalDues = rows.reduce((s, r) => s + (r.dues || 0), 0)
   const totalExp = rows.reduce((s, r) => s + (r.expenseAmt != null ? r.expenseAmt : 0), 0)
   const netProfit = totalProfit - totalExp
 
   const esc = escHtml
   const now = new Date()
-  const typeBadge = (k: StmtRow['kind']) => {
-    if (k === 'app') return `<span class="bdg bdg-app">App</span>`
-    if (k === 'weapon') return `<span class="bdg bdg-weapon">Weapon</span>`
-    return `<span class="bdg bdg-exp">Expense</span>`
-  }
-
   let idx = 0
   const trs = rows
     .map((r) => {
       idx += 1
-      const rowClass = r.kind === 'expense' ? 'row-exp' : ''
-      const duesCell =
-        r.dues > 0.001
-          ? `<td class="td-dues">${formatRs(r.dues)}</td>`
-          : `<td>${r.kind === 'expense' ? '—' : formatRs(r.dues)}</td>`
-      const pShow = r.profit == null ? '—' : formatRs(r.profit)
-      const profCell =
-        r.profit != null && Math.abs(r.profit) > 0.001
-          ? `<td class="td-profit">${pShow}</td>`
-          : `<td>${pShow}</td>`
-      return `<tr class="${rowClass}">
-        <td>${idx}</td>
-        <td>${esc(formatDateDisplay(r.date))}</td>
-        <td>${typeBadge(r.kind)}</td>
-        <td>${esc(r.name)}</td>
-        <td>${esc(r.catOrRef)}</td>
-        <td>${r.cost != null ? formatRs(r.cost) : '—'}</td>
-        <td>${r.sale != null ? formatRs(r.sale) : '—'}</td>
-        ${duesCell}
-        ${profCell}
-        <td>${r.expenseAmt != null ? formatRs(r.expenseAmt) : '—'}</td>
+      const paid = stmtRowPaid(r)
+      const duesHi = r.kind !== 'expense' && r.dues > 0.001
+      const profHi = r.profit != null && Math.abs(r.profit) > 0.001
+      return `<tr class="${r.kind === 'expense' ? 'row-exp' : ''}">
+        <td class="col-id">${idx}</td>
+        <td class="col-date">${esc(formatDateDisplay(r.date))}</td>
+        <td class="col-desc">${esc(stmtRowDescription(r))}</td>
+        <td class="num">${esc(stmtPrintDebitCredit(r.sale))}</td>
+        <td class="num">${esc(stmtPrintDebitCredit(paid))}</td>
+        <td class="num${duesHi ? ' dues-hi' : ''}">${esc(stmtPrintDebitCredit(r.kind === 'expense' ? null : r.dues))}</td>
+        <td class="num">${esc(stmtPrintDebitCredit(r.expenseAmt))}</td>
+        <td class="num${profHi ? ' profit-hi' : ''}">${esc(stmtPrintDebitCredit(r.profit))}</td>
       </tr>`
     })
     .join('')
 
-  const rangeLabel = (() => {
-    const f = (fromIso || '').trim()
-    const t = (toIso || '').trim()
-    if (mode === 'custom' && (f || t)) return `${f || '—'} → ${t || '—'}`
-    if (mode === 'daily' && f) return f
-    if (mode === 'monthly' && f) return f.slice(0, 7)
-    return '—'
-  })()
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Statement — ${esc(PRINT_INVOICE_SHOP.name)}</title>
-<style>
-  @page { size: A4 portrait; margin: 10mm; }
-  :root{
-    --head:#0b3b66;
-    --line:#d7e2ef;
-    --mut:#334155;
-    --panel:#ffffff;
-  }
-  *{box-sizing:border-box;}
-  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;margin:0;padding:0;background:#f1f5f9;font-size:10.5px;}
-  .sheet{max-width:190mm;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
-  .top{display:flex;justify-content:space-between;align-items:stretch;gap:12px;padding:14px 16px;background:var(--head);color:#fff;}
-  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
-  .logo{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.12);display:grid;place-items:center;flex:0 0 auto;}
-  .brandtxt{min-width:0;}
-  .brandname{font-weight:1000;letter-spacing:.06em;font-size:13px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .brandsub{opacity:.92;font-weight:800;font-size:10px;margin-top:3px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .stmt{text-align:right;}
-  .stmt .t{font-size:12px;font-weight:1000;text-transform:uppercase;letter-spacing:.08em;line-height:1.1;}
-  .stmt .p{opacity:.92;font-weight:900;font-size:10px;margin-top:4px;}
-  .info{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);}
-  .card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);}
-  .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:10.5px;}
-  .k{color:var(--mut);font-weight:900;}
-  .v{font-weight:1000;}
-  table{width:100%;border-collapse:collapse;font-size:10.5px;}
-  thead th{background:var(--head);color:#fff;font-weight:1000;text-transform:uppercase;letter-spacing:.05em;font-size:9.5px;padding:9px 8px;border-bottom:1px solid #083257;}
-  tbody td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
-  tbody tr:nth-child(even) td{background:#fbfdff;}
-  tbody tr.row-exp td{background:#ffedd5;}
-  td.num{text-align:right;white-space:nowrap;}
-  .bdg{display:inline-block;padding:2px 6px;border-radius:999px;font-weight:950;font-size:9px;color:#fff;}
-  .bdg-app{background:#2563eb;}
-  .bdg-weapon{background:#16a34a;}
-  .bdg-exp{background:#ea580c;}
-  .td-dues{color:#dc2626;font-weight:1000;}
-  .td-profit{color:#15803d;font-weight:1000;}
-  .wrap{padding:10px 16px 0;}
-  .summary{margin:12px 16px 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
-  .summary-h{background:var(--head);color:#fff;font-weight:1000;text-transform:uppercase;letter-spacing:.06em;font-size:10px;padding:8px 10px;}
-  .summary-b{background:#fff;}
-  .sum-row{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-top:1px solid var(--line);font-weight:1000;font-size:10.5px;}
-  .sum-row:first-child{border-top:none;}
-  .sum-row .lab{color:var(--mut);font-weight:900;}
-  .sum-row .val{min-width:120px;text-align:right;}
-  .sum-row.sum-dues .lab,.sum-row.sum-dues .val{color:#dc2626;}
-  .sum-row.sum-exp .lab,.sum-row.sum-exp .val{color:#ea580c;}
-  .sum-row.sum-net .lab,.sum-row.sum-net .val{color:#15803d;font-size:12px;}
-  .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:12px 16px 16px;border-top:1px solid var(--line);background:#fff;}
-  .note{font-size:10px;color:var(--mut);font-weight:700;line-height:1.35;max-width:65%;}
-  .sig{min-width:140px;text-align:center;}
-  .sig .line{height:1px;background:var(--mut);opacity:.6;margin:22px 0 6px;}
-  .sig .lbl{font-size:10px;color:var(--mut);font-weight:800;}
-  @media print { body { background:#fff; } .sheet{border:none;border-radius:0;} }
-</style></head><body>
-<div class="sheet">
-  <div class="top">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-          <path d="M4 18.5L12 3l8 15.5" stroke="rgba(255,255,255,.95)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M7.5 14h9" stroke="rgba(255,255,255,.95)" stroke-width="2.2" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="brandtxt">
-        <div class="brandname">${esc(PRINT_INVOICE_SHOP.name)}</div>
-        <div class="brandsub">${esc(PRINT_INVOICE_SHOP.phone)}</div>
-      </div>
+  const periodLine = reportPeriodLabel(mode, fromIso, toIso)
+  const printedWhen = `${formatHeaderDate(now)} | ${formatHeaderTime(now)}`
+  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Statement — ${escAttr(PRINT_INVOICE_SHOP.name)}</title>
+<style>${PRINT_EXCEL_REPORT_CSS}</style>
+</head><body>
+<div class="page">
+  <div class="hdr">
+    <div class="shop">
+      <div class="name">${esc(PRINT_INVOICE_SHOP.name)}</div>
+      <div class="line">${esc(PRINT_INVOICE_SHOP.phone)}</div>
     </div>
-    <div class="stmt">
-      <div class="t">Statement</div>
-      <div class="p">— ${esc(reportModeTitle(mode))} · ${esc(rangeLabel)} —</div>
+    <div class="stmt-hd">
+      <div class="title">STATEMENT</div>
+      <div class="sub">${esc(reportModeSubTitle(mode))}</div>
+      <div class="when">${esc(printedWhen)}</div>
     </div>
   </div>
-
-  <div class="info">
-    <div class="card">
-      <div class="kv">
-        <div class="k">Printed</div><div class="v">${esc(`${formatHeaderDate(now)} ${formatHeaderTime(now)}`)}</div>
-        <div class="k">Records</div><div class="v">${esc(String(rows.length))}</div>
-        <div class="k">Scope</div><div class="v">All (Apps + Weapon + Expenses)</div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="kv">
-        <div class="k">Currency</div><div class="v">PKR</div>
-        <div class="k">Software</div><div class="v">ESYSOFT</div>
-        <div class="k">Mode</div><div class="v">${esc(reportModeTitle(mode))}</div>
-      </div>
+  <hr class="rule" />
+  <div class="period-line">${esc(periodLine)} | Records: ${rows.length} | Apps + Weapon + Expenses</div>
+  <div class="stmt-table-wrap">
+  <table class="stmt-table excel-report">
+    <colgroup>
+      <col style="width:5%" /><col style="width:10%" /><col style="width:28%" />
+      <col style="width:11%" /><col style="width:11%" /><col style="width:11%" />
+      <col style="width:11%" /><col style="width:11%" />
+    </colgroup>
+    <thead><tr>
+      <th class="col-id">ID</th><th class="col-date">Date</th><th class="col-desc">Description</th>
+      <th class="num">Sale</th><th class="num">Paid</th><th class="num">Dues</th>
+      <th class="num">Expense</th><th class="num">Profit</th>
+    </tr></thead>
+    <tbody>${trs || '<tr><td colspan="8">—</td></tr>'}</tbody>
+  </table>
+  </div>
+  <div class="fin-wrap">
+    <div class="fin-box">
+      <div class="fin-title">FINANCIAL SUMMARY</div>
+      <div class="fin-row"><span>Total Sales</span><span>${esc(stmtPrintMoney(totalSale))}</span></div>
+      <div class="fin-row"><span>Total Cost</span><span>${esc(stmtPrintMoney(totalCost))}</span></div>
+      <div class="fin-row"><span>Total Expenses</span><span>${esc(stmtPrintMoney(totalExp))}</span></div>
+      <div class="fin-row net"><span>NET PROFIT</span><span>${esc(stmtPrintMoney(netProfit))}</span></div>
     </div>
   </div>
-
-  <div class="wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:34px">#</th>
-          <th style="width:74px">Date</th>
-          <th style="width:64px">Type</th>
-          <th>Name</th>
-          <th style="width:130px">Category / Weapon No.</th>
-          <th style="text-align:right;width:76px">Cost</th>
-          <th style="text-align:right;width:76px">Sale</th>
-          <th style="text-align:right;width:70px">Dues</th>
-          <th style="text-align:right;width:76px">Profit</th>
-          <th style="text-align:right;width:76px">Expense</th>
-        </tr>
-      </thead>
-      <tbody>${trs || '<tr><td colspan="10">—</td></tr>'}</tbody>
-    </table>
-  </div>
-
-  <div class="summary">
-    <div class="summary-h">Summary</div>
-    <div class="summary-b">
-      <div class="sum-row"><span class="lab">Total Sale</span><span class="val">${formatRs(totalSale)}</span></div>
-      <div class="sum-row"><span class="lab">Total Cost</span><span class="val">${formatRs(totalCost)}</span></div>
-      <div class="sum-row"><span class="lab">Total Profit</span><span class="val">${formatRs(totalProfit)}</span></div>
-      <div class="sum-row sum-dues"><span class="lab">Total Dues</span><span class="val">${formatRs(totalDues)}</span></div>
-      <div class="sum-row sum-exp"><span class="lab">Total Expenses</span><span class="val">${formatRs(totalExp)}</span></div>
-      <div class="sum-row sum-net"><span class="lab">Net Profit</span><span class="val">${formatRs(netProfit)}</span></div>
-    </div>
-  </div>
-
-  <div class="foot">
-    <div class="note">
-      Important details shown in this statement are generated by the software.
-      Please verify totals before record keeping.
-    </div>
-    <div class="sig">
-      <div class="line"></div>
-      <div class="lbl">Signature</div>
-    </div>
-  </div>
+  <div class="foot"><div>*** This is a Computer Generated Print ***</div><div class="p2">POWERED BY GUL CORPORATION LLC</div></div>
 </div>
 </body></html>`
-
-  printFullDocument(html)
+  printFullDocument(doc)
 }
+
+const PRINT_EXCEL_REPORT_CSS = `
+  @page { size: A4 portrait; margin: 10mm; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;font-family:Arial,'Segoe UI',Helvetica,sans-serif;font-size:10px;color:#000;background:#fff;}
+  .page{width:100%;max-width:100%;margin:0;padding:0;}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;}
+  .shop{flex:1;min-width:0;}
+  .shop .name{font-size:16px;font-weight:700;line-height:1.15;}
+  .shop .line{margin-top:3px;font-size:10px;}
+  .stmt-hd{flex:0 0 auto;text-align:right;max-width:48%;}
+  .stmt-hd .title{font-size:17px;font-weight:700;}
+  .stmt-hd .sub{margin-top:2px;font-size:10px;font-weight:700;}
+  .stmt-hd .when{margin-top:2px;font-size:9px;line-height:1.3;}
+  .rule{border:none;border-top:3px solid #000;margin:10px 0 12px;width:100%;}
+  .period-line{margin:0 0 10px;font-size:10px;font-weight:700;width:100%;}
+  .stmt-table-wrap{width:100%;max-width:100%;overflow:hidden;}
+  .stmt-table{width:100%;max-width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;}
+  .stmt-table th,.stmt-table td{border:1px solid #000;padding:4px 5px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;}
+  .stmt-table thead th{background:#f2f2f2;font-weight:700;font-size:9px;line-height:1.2;}
+  .stmt-table th.num,.stmt-table td.num{text-align:right;font-size:9px;padding:4px 3px;white-space:normal;word-break:break-word;}
+  .stmt-table .col-id{text-align:center;white-space:nowrap;}
+  .stmt-table .col-date{white-space:nowrap;font-size:9px;}
+  .stmt-table .col-desc{word-break:break-word;overflow-wrap:break-word;line-height:1.25;}
+  .stmt-table tr.row-exp td{background:#fff7ed;}
+  .stmt-table td.dues-hi{color:#dc2626;font-weight:700;}
+  .stmt-table td.profit-hi{color:#15803d;font-weight:700;}
+  .fin-wrap{display:flex;justify-content:flex-end;margin-top:20px;width:100%;}
+  .fin-box{width:260px;max-width:46%;border:2px solid #000;flex-shrink:0;}
+  .fin-title{text-align:center;font-weight:700;font-size:10px;padding:6px 8px;border-bottom:1px solid #000;}
+  .fin-row{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-bottom:1px solid #bdbdbd;font-weight:700;font-size:10px;}
+  .fin-row:last-child{border-bottom:none;}
+  .fin-row.net{color:#15803d;font-size:11px;padding:7px 8px;}
+  .foot{margin-top:36px;text-align:center;font-size:9px;line-height:1.5;width:100%;}
+  .foot .p2{margin-top:4px;font-weight:700;}
+  @media print{
+    html,body{width:100%;overflow:visible;}
+    .page{width:100%;}
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+`
+
 
 type ClientDetailHit =
   | { kind: 'app'; entry: Entry }
@@ -5837,139 +6155,34 @@ function collectClientDetailHits(query: string): ClientDetailHit[] {
   return out
 }
 
-function printClientDetailStatement(query: string) {
-  const esc = escHtml
+async function printClientDetailStatement(query: string) {
   const q = query.trim()
   if (!q) {
     window.alert('Enter a search term first, then click Print.')
     return
   }
   const hits = collectClientDetailHits(q)
-  let totalPaid = 0
-  let totalDues = 0
-  const rowsHtml = hits
-    .map((h, i) => {
-      let typeL = ''
-      let date = ''
-      let name = ''
-      let detail = ''
-      let cnicOr = ''
-      let saleV: number | null = null
-      let paid = 0
-      let dues = 0
-      let status = ''
-      if (h.kind === 'app') {
-        const e = h.entry
-        typeL = 'Application'
-        date = formatDateDisplay(e.entryDate)
-        name = (e.name || '').trim() || '—'
-        detail =
-          [e.reference, e.trackingId, e.category].map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
-        cnicOr = (e.cnic || '').trim() || '—'
-        saleV = e.salePrice
-        paid = entryPaidTowardSale(e)
-        dues = entryLineDues(e)
-        status = entryStatusLabel(e)
-      } else if (h.kind === 'weapon') {
-        const l = h.line
-        typeL = 'Weapon allot'
-        date = formatDateDisplay(l.entryDate)
-        name = (l.client || '').trim() || '—'
-        detail = (l.weaponNumber || '').trim() || '—'
-        cnicOr = '—'
-        saleV = l.salePrice
-        paid = weaponLinePaidTowardSale(l)
-        dues = lineDues(l)
-        status = dues > 0.001 ? 'Pending dues' : '—'
-      } else {
-        const r = h.row
-        typeL = 'General dues'
-        date = formatDateDisplay(r.entryDate)
-        name = generalEntryDisplayName(r)
-        detail = (r.description || '').trim() || '—'
-        cnicOr = '—'
-        saleV = r.amount
-        paid = generalDuesPaidAmount(r)
-        dues = generalDuesRemaining(r)
-        status = dues > 0.001 ? 'Active' : 'Settled'
-      }
-      totalPaid += paid
-      totalDues += dues
-      return `<tr>
-        <td>${i + 1}</td>
-        <td>${esc(typeL)}</td>
-        <td>${esc(date)}</td>
-        <td>${esc(name)}</td>
-        <td>${esc(detail)}</td>
-        <td>${esc(cnicOr)}</td>
-        <td class="num">${saleV != null ? formatRs(saleV) : '—'}</td>
-        <td class="num">${formatRs(paid)}</td>
-        <td class="num td-dues">${formatRs(dues)}</td>
-        <td>${esc(status)}</td>
-      </tr>`
-    })
-    .join('')
-  const count = hits.length
-  const now = new Date()
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>${escAttr(`Client detail — ${q}`)}</title>
-<style>
-  @page { size: A4 portrait; margin: 10mm; }
-  :root{--ink:#0f172a;--mut:#475569;--line:#e2e8f0;--head:#0b3b66;}
-  *{box-sizing:border-box;}
-  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--ink);margin:0;padding:0;background:#f1f5f9;font-size:11px;}
-  .sheet{max-width:190mm;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
-  .top{padding:14px 16px;background:var(--head);color:#fff;}
-  .brand{font-weight:1000;font-size:14px;letter-spacing:.06em;}
-  .sub{font-size:10px;opacity:.92;margin-top:4px;font-weight:800;}
-  .meta{margin-top:10px;font-size:10px;font-weight:800;opacity:.95;}
-  .sec-h{font-weight:1000;text-transform:uppercase;letter-spacing:.08em;font-size:10px;color:var(--mut);padding:10px 16px 6px;background:#fafafa;border-top:1px solid var(--line);}
-  table{width:100%;border-collapse:collapse;font-size:10px;}
-  th{background:var(--head);color:#fff;font-weight:1000;padding:8px 6px;text-align:left;border-bottom:1px solid #083257;}
-  th.num,td.num{text-align:right;}
-  td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top;}
-  tr:nth-child(even) td{background:#f8fafc;}
-  .td-dues{color:#dc2626;font-weight:1000;}
-  .sumwrap{padding:0 16px 14px;}
-  .sum{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden;}
-  .sum-h{background:var(--head);color:#fff;font-weight:1000;text-transform:uppercase;font-size:10px;padding:8px 10px;}
-  .sum-b{background:#fff;}
-  .sum-r{display:flex;justify-content:space-between;padding:8px 10px;border-top:1px solid var(--line);font-weight:1000;}
-  .sum-r:first-child{border-top:none;}
-  .sum-r .lab{color:var(--mut);font-weight:900;}
-  .foot{padding:12px 16px;font-size:9.5px;color:var(--mut);border-top:1px solid var(--line);}
-  @media print{body{background:#fff}.sheet{border:none;border-radius:0}}
-</style></head><body>
-<div class="sheet">
-  <div class="top">
-    <div class="brand">${esc(PRINT_INVOICE_SHOP.name)}</div>
-    <div class="sub">Client detail statement · Search: ${esc(q)}</div>
-    <div class="meta">Printed ${esc(`${formatHeaderDate(now)} ${formatHeaderTime(now)}`)} · PKR · Cost and profit are not shown on this sheet.</div>
-  </div>
-  <div class="sec-h">Detail</div>
-  <div style="padding:0 8px 8px">
-    <table>
-      <thead><tr>
-        <th>#</th><th>Type</th><th>Date</th><th>Name</th><th>Reference / Client / Details</th><th>CNIC</th>
-        <th class="num">Sale</th><th class="num">Paid</th><th class="num">Dues</th><th>Status</th>
-      </tr></thead>
-      <tbody>${rowsHtml || '<tr><td colspan="10">No matching records.</td></tr>'}</tbody>
-    </table>
-  </div>
-  <div class="sec-h">Summary</div>
-  <div class="sumwrap">
-    <div class="sum">
-      <div class="sum-h">Totals</div>
-      <div class="sum-b">
-        <div class="sum-r"><span class="lab">Total lines (applications + weapon + general)</span><span>${esc(String(count))}</span></div>
-        <div class="sum-r"><span class="lab">Total paid (collected)</span><span>${formatRs(totalPaid)}</span></div>
-        <div class="sum-r"><span class="lab">Total remaining (dues)</span><span style="color:#dc2626;font-weight:1000">${formatRs(totalDues)}</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="foot">Detail lists every matching record. Summary shows counts, total collected, and outstanding dues only.</div>
-</div>
-</body></html>`
-  printFullDocument(html)
+  if (!hits.length) {
+    window.alert('No matching records for this search.')
+    return
+  }
+  const range = await promptDateRangeModal({
+    title: 'Client detail print',
+    subtitle: 'From — To date range select karein.',
+  })
+  if (!range) return
+  const ledger = buildClientSearchLedgerRows(hits, range.fromIso, range.toIso)
+  if (!ledger.length) {
+    window.alert('Is date range mein koi record nahi mila.')
+    return
+  }
+  printClientLedgerDocument({
+    title: `Client detail — ${q}`,
+    subTitle: 'CLIENT DETAIL STATEMENT',
+    clientLine: `Search: ${q} | Period: ${range.fromIso} → ${range.toIso} | appl · wepl · gen`,
+    ledger,
+    showSrcCol: true,
+  })
 }
 
 function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void }) {
@@ -6561,89 +6774,71 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
     if (mode === 'clientDetail') {
       const q = clientDetailSearchIn.value
       const hits = collectClientDetailHits(q)
-      let totalSale = 0
-      let totalPaid = 0
-      let totalDues = 0
-      for (const h of hits) {
-        if (h.kind === 'app') {
-          totalSale += h.entry.salePrice ?? 0
-          totalPaid += entryPaidTowardSale(h.entry)
-          totalDues += entryLineDues(h.entry)
-        } else if (h.kind === 'weapon') {
-          totalSale += h.line.salePrice ?? 0
-          totalPaid += weaponLinePaidTowardSale(h.line)
-          totalDues += lineDues(h.line)
-        } else {
-          totalSale += h.row.amount
-          totalPaid += generalDuesPaidAmount(h.row)
-          totalDues += generalDuesRemaining(h.row)
-        }
-      }
+      let totalDebit = 0
+      const noteLine = (parts: string[]) => parts.map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
       const qDisp = q.trim() || '—'
+      for (const h of hits) {
+        if (h.kind === 'app') totalDebit += h.entry.salePrice ?? 0
+        else if (h.kind === 'weapon') totalDebit += h.line.salePrice ?? 0
+        else totalDebit += h.row.amount
+      }
       summary.textContent =
         hits.length === 0 && !q.trim()
-          ? `Client Detail Statement | Enter a search term (application fields, weapon client, general dues name/description).`
-          : `Client Detail Statement | Search: "${qDisp}" | Lines: ${hits.length} | Sale: ${formatRs(totalSale)} | Paid: ${formatRs(totalPaid)} | Dues: ${formatRs(totalDues)}`
+          ? `Client Detail Statement | Search likhein (name, reference, weapon client, general dues). Print par date range + debit/credit statement.`
+          : `Client Detail Statement | Search: "${qDisp}" | Records: ${hits.length} | Debit (charges): ${formatRs(totalDebit)} | Print for wasool (credit) + balance`
       if (theadTr) {
-        theadTr.innerHTML = `<th>Type</th><th>Date</th><th>Name</th><th>Reference / Client / Details</th><th>CNIC</th><th>Sale</th><th>Paid</th><th>Dues</th><th>Status</th><th>Action</th>`
+        theadTr.innerHTML = `<th>Cat</th><th>Date</th><th>Name / Reference</th><th>Note</th><th>Debit</th><th>Credit</th><th>Action</th>`
       }
       if (tbody) {
         tbody.innerHTML =
           hits
             .map((h) => {
+              const meta = clientDetailGroupMeta(h)
+              const cat = clientDetailSrcTag(h.kind)
               if (h.kind === 'app') {
                 const e = h.entry
-                const st = entryStatusLabel(e)
-                const detail =
-                  [e.reference, e.trackingId, e.category].map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
+                const debit = e.salePrice ?? 0
+                totalDebit += debit
+                const note = noteLine([e.trackingId, e.weaponNumber, e.category])
                 return `<tr data-entry-id="${e.id}">
-            <td>Application</td>
+            <td>${esc(cat)}</td>
             <td>${esc(formatDateDisplay(e.entryDate))}</td>
-            <td>${esc(e.name || '—')}</td>
-            <td>${esc(detail)}</td>
-            <td>${esc(e.cnic || '—')}</td>
+            <td>${esc(meta.nameRef)}</td>
+            <td>${esc(note)}</td>
             <td>${e.salePrice !== null ? formatRs(e.salePrice) : '—'}</td>
-            <td>${formatRs(entryPaidTowardSale(e))}</td>
-            <td class="${entryLineDues(e) > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(entryLineDues(e))}</td>
-            <td><span class="pill ${st.toLowerCase()}">${esc(st)}</span></td>
+            <td>—</td>
             ${entryActionCellHtml(e, { showRecycle: true })}
           </tr>`
               }
               if (h.kind === 'weapon') {
                 const l = h.line
-                const dues = lineDues(l)
+                const debit = l.salePrice ?? 0
+                totalDebit += debit
+                const wn = (l.weaponNumber || '').trim() || '—'
                 return `<tr>
-            <td>Weapon allot</td>
+            <td>${esc(cat)}</td>
             <td>${esc(formatDateDisplay(l.entryDate))}</td>
-            <td>${esc((l.client || '').trim() || '—')}</td>
-            <td>${esc((l.weaponNumber || '').trim() || '—')}</td>
-            <td>—</td>
+            <td>${esc(meta.nameRef)}</td>
+            <td>${esc(wn)}</td>
             <td>${l.salePrice !== null ? formatRs(l.salePrice) : '—'}</td>
-            <td>${formatRs(weaponLinePaidTowardSale(l))}</td>
-            <td class="${dues > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(dues)}</td>
             <td>—</td>
             <td class="td-actions">—</td>
           </tr>`
               }
               const r = h.row
-              const dues = generalDuesRemaining(r)
-              const name = generalEntryDisplayName(r)
-              const st = dues > 0.001 ? 'Active' : 'Settled'
+              totalDebit += r.amount
               return `<tr>
-            <td>General dues</td>
+            <td>${esc(cat)}</td>
             <td>${esc(formatDateDisplay(r.entryDate))}</td>
-            <td>${esc(name)}</td>
+            <td>${esc(meta.nameRef)}</td>
             <td>${esc((r.description || '').trim() || '—')}</td>
-            <td>—</td>
             <td>${formatRs(r.amount)}</td>
-            <td>${formatRs(generalDuesPaidAmount(r))}</td>
-            <td class="${dues > 0.001 ? 'rep-dues-hi' : ''}">${formatRs(dues)}</td>
-            <td>${esc(st)}</td>
+            <td>—</td>
             <td class="td-actions">—</td>
           </tr>`
             })
             .join('') ||
-          `<tr><td colspan="10" class="empty">${q.trim() ? 'No matching records.' : 'Type a search term to list applications, weapon allotments, and general dues.'}</td></tr>`
+          `<tr><td colspan="7" class="empty">${q.trim() ? 'No matching records.' : 'Type a search term — e.g. janzada — for application, weapon allot, and general dues.'}</td></tr>`
       }
       return
     }
@@ -6689,6 +6884,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
     if (!m) return
     mode = m
     syncFiltActive()
+    if (m === 'clientDetail') queueMicrotask(() => clientDetailSearchIn.focus())
     repRender()
   })
   fromD.addEventListener('change', () => repRender())
@@ -6696,7 +6892,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   clientDetailSearchIn.addEventListener('input', () => repRender())
 
   printB.addEventListener('click', () => {
-    if (mode === 'clientDetail') printClientDetailStatement(clientDetailSearchIn.value)
+    if (mode === 'clientDetail') void printClientDetailStatement(clientDetailSearchIn.value)
     else printAccountStatement(mode, fromD.value, toD.value)
   })
 
@@ -6777,5 +6973,8 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
   wrap.append(head, filt, customRow, clientSearchRow, printRow, tool, tableWrap)
   return wrap
 }
+
+/** Referenced so paid-toward-sale helpers stay available for dues/history UI. */
+void { entryPaidTowardSale, weaponLinePaidTowardSale, generalDuesPaidAmount }
 
 render()

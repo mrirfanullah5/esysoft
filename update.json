@@ -1,11 +1,11 @@
 {
-  "version": "1.4.3",
-  "notes": "New changes: confirmations in General Entry and dues, and more. Bug fixes.",
-  "pub_date": "2026-05-13T11:00:00+05:00",
+  "version": "1.5.0",
+  "notes": "v1.5.0 — Print design updated (Daily, Monthly, Custom reports). Statement design improved (client detail & dues). Bug fixes. Software performance and stability improvements for a smoother experience.",
+  "pub_date": "2026-05-18T09:00:00+05:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2anU2TUtZZUc5d0xoU3doZEJjMlpWMi8ydFY3eXluU01raVFQdFh2MERPQVR0VWVQVWgzM0l4MG14YTkzc3RLanNQZjB0eGJSVHdwNVJYbDRqY3RWYlFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4NjkyNzY0CWZpbGU6RVNZU09GVF8xLjQuM194NjQtc2V0dXAuZXhlClUwK21GQlRHV1E0SmNGU0dJeUlueXF3WDREcTNGVlAybTVkNllUaFF2bHk0bDBqSEVDMDRVNFRYYjA0aHlySFNQNUxaRHB1Y2lMeE1kdW45dUNjYUJBPT0K",
-      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.4.3/ESYSOFT_1.4.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2amhTTWozeWYvRGZmaUVQaDFpRm5XV1h2ajZVclgzKzIrSTA3SDNNL1d5ZEIxK3o3eitndEJidHZWaDBmZUVWWXgxRnBuSFM1eVZsbFYvYTlyNy9GN0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MjE2NDY1CWZpbGU6RVNZU09GVF8xLjUuMF94NjQtc2V0dXAuZXhlCmtQNlZ4T3kraVc2OEcvTU9qMnRGeDA2N3pRZGx5dzZ0Z3lHVG5hNm9GNTQ3Z3RoVGZrajlkNVYxMU9SR2tob3BnUFFuVE5mUTNSb0QrbGFpV3IwYkR3PT0K",
+      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.5.0/ESYSOFT_1.5.0_x64-setup.exe"
     }
   }
 }
