@@ -4169,6 +4169,82 @@ body.theme-light .stat-warn-caption {
   height: 18px;
 }
 
+/* Edit / delete icon buttons (PNG + SVG in /public/icons) */
+.btn-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+  line-height: 0;
+  vertical-align: middle;
+}
+.btn-ico:hover {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(30, 41, 59, 0.85);
+}
+.btn-ico .ico-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+.btn-ico.delete,
+.btn-ico.mini-danger {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+}
+.btn-ico.delete:hover,
+.btn-ico.mini-danger:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+.btn.btn-ico-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn.btn-ico-lbl .ico-img {
+  width: 20px;
+  height: 20px;
+}
+.action-dd-item.action-dd-item-ico {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.action-dd-item-ico .ico-img {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.allot-table-scroll .table td.expense-actions .btn-ico,
+.weapon-group-modal-actions-cell .btn-ico,
+.general-detail-actions-cell .btn-ico {
+  width: 100%;
+  box-sizing: border-box;
+}
+.weapon-group-modal-actions-cell,
+.general-detail-actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.recycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .action-dd {
   position: relative;
   display: inline-block;
@@ -5876,6 +5952,216 @@ body.theme-light .stat-warn-caption {
 .rep-dues-hi {
   color: rgba(248, 113, 113, 0.98) !important;
   font-weight: 1000 !important;
+}
+
+.rep-print-row.is-hidden {
+  display: none;
+}
+
+/* Client detail statement popup — 14in × 7in */
+.client-stmt-modal-overlay {
+  z-index: 2400;
+}
+
+.client-stmt-modal {
+  width: 14in;
+  height: 7in;
+  max-width: min(14in, 96vw);
+  max-height: min(7in, 92vh);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(11, 18, 36, 0.99) 100%);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.client-stmt-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.client-stmt-title {
+  font-size: 16px;
+  font-weight: 1000;
+  color: rgba(248, 250, 252, 0.98);
+}
+
+.client-stmt-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.client-stmt-lbl {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.client-stmt-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: min(280px, 100%);
+}
+
+.client-stmt-search-wrap .client-stmt-search-in {
+  width: 100%;
+  min-width: 0;
+}
+
+.client-stmt-suggest {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(11, 18, 36, 0.99);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+}
+
+.client-stmt-suggest.is-open {
+  display: block;
+}
+
+.client-stmt-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: transparent;
+  color: rgba(248, 250, 252, 0.96);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.client-stmt-suggest-item:last-child {
+  border-bottom: none;
+}
+
+.client-stmt-suggest-item:hover,
+.client-stmt-suggest-item.is-active {
+  background: rgba(236, 72, 153, 0.18);
+}
+
+.client-stmt-suggest-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-stmt-suggest-hint {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(148, 163, 184, 0.92);
+  text-transform: lowercase;
+}
+
+.client-stmt-summary {
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(226, 232, 240, 0.9);
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.client-stmt-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+}
+
+.client-stmt-table {
+  width: 100%;
+  font-size: 11px;
+}
+
+.client-stmt-table th,
+.client-stmt-table td {
+  padding: 6px 8px;
+}
+
+.client-stmt-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.client-stmt-table tr.row-open-dues td {
+  background: rgba(239, 68, 68, 0.22);
+  color: rgba(254, 226, 226, 0.98);
+  font-weight: 800;
+}
+
+.client-stmt-table tr.row-open-dues td.num {
+  color: rgba(252, 165, 165, 0.98);
+}
+
+.client-stmt-fin {
+  flex-shrink: 0;
+}
+
+.client-stmt-fin-box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 2px solid rgba(34, 197, 94, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.client-stmt-fin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.client-stmt-fin-row b {
+  font-size: 13px;
+  color: rgba(248, 250, 252, 0.98);
+}
+
+.client-stmt-fin-baqi b {
+  color: rgba(74, 222, 128, 0.98);
+  font-size: 14px;
+}
+
+.client-stmt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .action-dd-danger {

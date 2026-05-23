@@ -1,11 +1,11 @@
 {
-  "version": "1.5.0",
-  "notes": "v1.5.0 — Print design updated (Daily, Monthly, Custom reports). Statement design improved (client detail & dues). Bug fixes. Software performance and stability improvements for a smoother experience.",
-  "pub_date": "2026-05-18T09:00:00+05:00",
+  "version": "1.5.1",
+  "notes": "Important update — Statement bug fixes and improvements. Client detail statement updated (Name / Reference / Client, search autocomplete, Received & Balance per entry, open dues highlight). Other fixes and stability improvements.",
+  "pub_date": "2026-05-23T09:00:00+05:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2amhTTWozeWYvRGZmaUVQaDFpRm5XV1h2ajZVclgzKzIrSTA3SDNNL1d5ZEIxK3o3eitndEJidHZWaDBmZUVWWXgxRnBuSFM1eVZsbFYvYTlyNy9GN0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MjE2NDY1CWZpbGU6RVNZU09GVF8xLjUuMF94NjQtc2V0dXAuZXhlCmtQNlZ4T3kraVc2OEcvTU9qMnRGeDA2N3pRZGx5dzZ0Z3lHVG5hNm9GNTQ3Z3RoVGZrajlkNVYxMU9SR2tob3BnUFFuVE5mUTNSb0QrbGFpV3IwYkR3PT0K",
-      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.5.0/ESYSOFT_1.5.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQ3pjaFNIQit2anFtSjdKK1prOFhVay9YWWsxQ1dJMlFSWUxKS2xTOUF0Q05qWFFrWG00Sm5HMStwM3h4bmZFUWRrcnp2QklPbmc5cEJkQlJ5c0N6dTA5MGVVUkNtRVFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5NTE5ODU0CWZpbGU6RVNZU09GVF8xLjUuMV94NjQtc2V0dXAuZXhlCmJldTI0U01OUW1qK0wxY2xBYUFZTDkwQlg4bzRPN01OL09lR2pXdkdMemhaNXl1NEdaSDQrbzA2ZjZ2bGRoYmZDSFQybFpocmZKNHhheS8wYjBWUkJ3PT0K",
+      "url": "https://github.com/mrirfanullah5/esysoft/releases/download/v1.5.1/ESYSOFT_1.5.1_x64-setup.exe"
     }
   }
 }

@@ -3,8 +3,11 @@ import './style.css'
 type Route = 'login' | 'home'
 
 /** Same as `package.json` and `src-tauri/tauri.conf.json` — bump all together. */
-const ESYSOFT_APP_VERSION = '1.5.0'
+const ESYSOFT_APP_VERSION = '1.5.1'
 const ESYSOFT_VERSION_LABEL = `EsySoft v${ESYSOFT_APP_VERSION}`
+
+/** Shop contact — login, welcome, invoices, statements, reports (prints). */
+const SHOP_CONTACT_PHONE = '+92 346 906 3693'
 
 const DEFAULT_PIN = '000000'
 const PIN_STORAGE_KEY = 'esysoft.pin.v1'
@@ -307,6 +310,53 @@ function formatCnicDigits(raw: string) {
   return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}`
 }
 
+function normalizeEntryNameKey(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function normalizeEntryCnicKey(cnic: string): string {
+  return clampDigits(cnic, 13)
+}
+
+/** Existing rows with same name (non-empty) or same full 13-digit CNIC. */
+function findDuplicateEntries(name: string, cnic: string, excludeId?: string): Entry[] {
+  const nameKey = normalizeEntryNameKey(name)
+  const cnicKey = normalizeEntryCnicKey(cnic)
+  const out: Entry[] = []
+  const seen = new Set<string>()
+  for (const e of loadEntries()) {
+    if (excludeId && e.id === excludeId) continue
+    const nameDup = nameKey.length > 0 && normalizeEntryNameKey(e.name) === nameKey
+    const cnicDup = cnicKey.length >= 13 && normalizeEntryCnicKey(e.cnic) === cnicKey
+    if (!nameDup && !cnicDup) continue
+    if (seen.has(e.id)) continue
+    seen.add(e.id)
+    out.push(e)
+  }
+  return out
+}
+
+async function confirmProceedDespiteDuplicateEntry(matches: Entry[], isEdit: boolean): Promise<boolean> {
+  const lines = matches.slice(0, 5).map((e) => {
+    const n = (e.name || '—').trim() || '—'
+    const c = formatCnicDigits(e.cnic) || '—'
+    const t = (e.trackingId || '').trim()
+    return t ? `${n} · CNIC ${c} · Tracking ${t}` : `${n} · CNIC ${c}`
+  })
+  const extra = matches.length > 5 ? `\n…and ${matches.length - 5} more.` : ''
+  const tail = isEdit
+    ? 'Do you want to save your changes anyway?'
+    : 'Do you want to save another entry anyway?'
+  return confirmModal({
+    title: 'Duplicate entry',
+    message: `An entry with the same name or CNIC already exists.\n\n${lines.join('\n')}${extra}\n\n${tail}`,
+    confirmText: 'Yes',
+    cancelText: 'No',
+    initialFocus: 'cancel',
+    disableEnterShortcut: true,
+  })
+}
+
 function makeEl<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   opts?: { className?: string; text?: string; attrs?: Record<string, string> },
@@ -407,8 +457,7 @@ function makeLogin(opts: { onSuccess: () => void }) {
     <div class="login-divider"></div>
     <div class="login-info">
       <div>Hayat & Brothers</div>
-      <div>Hayat Ullah: +923469083693</div>
-      <div>Irfan Ullah: +923349351073</div>
+      <div>${SHOP_CONTACT_PHONE}</div>
     </div>
     <div class="login-spacer"></div>
     <div class="login-corp">GUL CORPORATION LLC</div>
@@ -563,9 +612,37 @@ function formatHeaderDate(d: Date) {
   })
 }
 
+function formatTime12h(d: Date) {
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
+
 function formatHeaderTime(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return formatTime12h(d)
+}
+
+/** Ledger / statement: date + 12-hour time from ISO sortAt. */
+function formatDateTime12hFromSortAt(sortAt: string): string {
+  const s = sortAt.trim()
+  const dateIso = s.slice(0, 10)
+  const d = new Date(s.includes('T') && s.length > 10 ? s : `${dateIso}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return formatDateDisplay(dateIso)
+  return `${formatDateDisplay(dateIso)} ${formatTime12h(d)}`
+}
+
+/** Ek din par bhi har debit/credit ki alag line — unique sortAt. */
+function nextLedgerSortAtForDay(daySeqMap: Map<string, number>, entryDate: string): string {
+  const day = entryDate.trim().slice(0, 10)
+  const n = (daySeqMap.get(day) ?? 0) + 1
+  daySeqMap.set(day, n)
+  const hh = 8 + Math.floor((n - 1) / 60) % 14
+  const mm = (n - 1) % 60
+  const ss = Math.min(59, (n * 3) % 60)
+  return `${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 }
 
 type NavId =
@@ -686,7 +763,7 @@ function makeHome(opts: { onLogout: () => void }) {
       <div class="welcome-card">
         <div class="welcome-card-h">Contact Us</div>
         <div class="welcome-card-n">Irfan Ullah</div>
-        <div class="welcome-card-p">+92 334 9351073</div>
+        <div class="welcome-card-p">${SHOP_CONTACT_PHONE}</div>
       </div>
       <p class="welcome-esc-hint">Press ESC to go back.</p>
     </div>
@@ -1732,7 +1809,7 @@ function entryActionCellHtml(
                 <button type="button" class="action-dd-btn mini" aria-haspopup="true" aria-expanded="false">Actions ▾</button>
                 <div class="action-dd-menu" role="menu">
                   <button type="button" class="action-dd-item" role="menuitem" data-act="view">View detail</button>
-                  <button type="button" class="action-dd-item" role="menuitem" data-act="edit">Edit</button>
+                  <button type="button" class="action-dd-item action-dd-item-ico" role="menuitem" data-act="edit">${ICON_EDIT_IMG}<span>Edit</span></button>
                   ${completeBtn}
                   <button type="button" class="action-dd-item" role="menuitem" data-act="print-bill">Print client bill</button>
                   <button type="button" class="action-dd-item" role="menuitem" data-act="print-detail">Print client detail</button>
@@ -1750,10 +1827,23 @@ function escAttr(s: string) {
   return escHtml(s).replaceAll("'", '&#39;')
 }
 
+const ICON_EDIT_IMG =
+  '<img class="ico-img" src="/icons/edit.png" width="24" height="24" alt="" aria-hidden="true" />'
+const ICON_DELETE_IMG =
+  '<img class="ico-img" src="/icons/delete.svg" width="24" height="24" alt="" aria-hidden="true" />'
+
+function editIconBtnHtml(classes: string, extraAttrs = '', label = 'Edit'): string {
+  return `<button type="button" class="btn-ico edit ${classes}" ${extraAttrs} aria-label="${escAttr(label)}" title="${escAttr(label)}">${ICON_EDIT_IMG}</button>`
+}
+
+function deleteIconBtnHtml(classes: string, extraAttrs = '', label = 'Delete'): string {
+  return `<button type="button" class="btn-ico delete ${classes}" ${extraAttrs} aria-label="${escAttr(label)}" title="${escAttr(label)}">${ICON_DELETE_IMG}</button>`
+}
+
 /** Shop block on printed bills / detail sheets (matches app branding). */
 const PRINT_INVOICE_SHOP = {
   name: 'Hayat & Brothers',
-  phone: '+92 334 9351073',
+  phone: SHOP_CONTACT_PHONE,
 } as const
 
 function formatInvoiceRupee(n: number) {
@@ -2251,7 +2341,7 @@ function openEntryViewDetailModal(
                 <div class="action-dd">
                   <button type="button" class="action-dd-btn mini" aria-haspopup="true" aria-expanded="false">Actions ▾</button>
                   <div class="action-dd-menu" role="menu">
-                    <button type="button" class="action-dd-item" role="menuitem" data-act="edit" data-entry-id="${escAttr(e.id)}">Edit</button>
+                    <button type="button" class="action-dd-item action-dd-item-ico" role="menuitem" data-act="edit" data-entry-id="${escAttr(e.id)}">${ICON_EDIT_IMG}<span>Edit</span></button>
                     ${completeBtn}
                     <button type="button" class="action-dd-item" role="menuitem" data-act="print-bill" data-entry-id="${escAttr(e.id)}">Print bill</button>
                     <button type="button" class="action-dd-item" role="menuitem" data-act="print-detail" data-entry-id="${escAttr(e.id)}">Print detail</button>
@@ -3186,8 +3276,8 @@ function makeWeaponAllotScreen(opts: { onBack: () => void }) {
         <td>${formatRs(lineProfit(l))}</td>
         <td>${formatRs(lineDues(l))}</td>
         <td class="weapon-group-modal-actions-cell">
-          <button type="button" class="mini weapon-detail-edit-row" data-weapon-detail-id="${escAttr(l.id)}">Edit</button>
-          <button type="button" class="mini mini-danger weapon-detail-delete-row" data-weapon-detail-id="${escAttr(l.id)}">Delete</button>
+          ${editIconBtnHtml('mini weapon-detail-edit-row', `data-weapon-detail-id="${escAttr(l.id)}"`)}
+          ${deleteIconBtnHtml('mini mini-danger weapon-detail-delete-row', `data-weapon-detail-id="${escAttr(l.id)}"`)}
         </td>
       </tr>`
         })
@@ -3562,7 +3652,7 @@ function makeExpenseScreen(opts: { onBack: () => void }) {
     const html = rows
       .map(
         (r) =>
-          `<tr><td>${formatDateDisplay(r.entryDate)}</td><td>${esc(r.description)}</td><td>${formatRs(r.amount)}</td><td class="expense-actions"><button type="button" class="mini expense-edit-row" data-expense-id="${escAttr(r.id)}">Edit</button><button type="button" class="mini mini-danger expense-delete-row" data-expense-id="${escAttr(r.id)}">Delete</button></td></tr>`,
+          `<tr><td>${formatDateDisplay(r.entryDate)}</td><td>${esc(r.description)}</td><td>${formatRs(r.amount)}</td><td class="expense-actions">${editIconBtnHtml('mini expense-edit-row', `data-expense-id="${escAttr(r.id)}"`)}${deleteIconBtnHtml('mini mini-danger expense-delete-row', `data-expense-id="${escAttr(r.id)}"`)}</td></tr>`,
       )
       .join('')
     if (tbody) tbody.innerHTML = html || `<tr><td colspan="4" class="empty">No expenses yet.</td></tr>`
@@ -3855,8 +3945,8 @@ function makeGeneralEntryScreen(opts: { onBack: () => void }) {
             <td style="text-align:right">${formatRs(r.amount)}</td>
             <td style="text-align:right">${r.kind === 'dues' ? formatRs(rem) : '—'}</td>
             <td class="weapon-group-modal-actions-cell">
-              <button type="button" class="mini general-detail-edit-row" data-general-detail-id="${escAttr(r.id)}">Edit</button>
-              <button type="button" class="mini mini-danger general-detail-delete-row" data-general-detail-id="${escAttr(r.id)}">Delete</button>
+              ${editIconBtnHtml('mini general-detail-edit-row', `data-general-detail-id="${escAttr(r.id)}"`)}
+              ${deleteIconBtnHtml('mini mini-danger general-detail-delete-row', `data-general-detail-id="${escAttr(r.id)}"`)}
             </td>
           </tr>`
         })
@@ -4413,6 +4503,10 @@ type ClientDuesLedgerRow = {
   sortAt: string
   date: string
   nameRef: string
+  /** Client detail: gen → Name; appl → Reference; wepl → Client */
+  colName: string
+  colReference: string
+  colClient: string
   note: string
   /** Customer par charge / qardan (balance barhta hai) */
   debit: number | null
@@ -4420,6 +4514,113 @@ type ClientDuesLedgerRow = {
   credit: number | null
   /** Application / weapon allot / general — client detail print */
   srcTag?: 'appl' | 'gen' | 'wepl'
+  /** Source record still has pending dues (Name / Reference / Client row highlight). */
+  hasOpenDues?: boolean
+  /** Application / weapon / general record id — per-row received & balance. */
+  sourceId?: string
+  /** Total received on source entry (sale − remaining dues). */
+  rowReceived?: number | null
+  /** Remaining dues on source entry. */
+  rowBalance?: number | null
+}
+
+const LEDGER_COL_DASH = '—'
+
+function ledgerRowCols(
+  srcTag: 'appl' | 'gen' | 'wepl',
+  fields: {
+    entryName?: string
+    reference?: string
+    client?: string
+    generalName?: string
+  },
+): { colName: string; colReference: string; colClient: string } {
+  if (srcTag === 'appl') {
+    const ref =
+      (fields.reference || '').trim() ||
+      [fields.entryName, fields.reference].map((x) => (x || '').trim()).filter(Boolean)[0] ||
+      LEDGER_COL_DASH
+    return { colName: LEDGER_COL_DASH, colReference: ref, colClient: LEDGER_COL_DASH }
+  }
+  if (srcTag === 'wepl') {
+    const cl = (fields.client || '').trim() || LEDGER_COL_DASH
+    return { colName: LEDGER_COL_DASH, colReference: LEDGER_COL_DASH, colClient: cl }
+  }
+  const nm = (fields.generalName || fields.entryName || '').trim() || LEDGER_COL_DASH
+  return { colName: nm, colReference: LEDGER_COL_DASH, colClient: LEDGER_COL_DASH }
+}
+
+function appEntryReferenceLabel(e: Entry): string {
+  const name = (e.name || '').trim()
+  const cnic = formatCnicDigits(e.cnic).trim()
+  const ref = (e.reference || '').trim()
+  const parts: string[] = []
+  if (name && cnic) parts.push(`${name} · ${cnic}`)
+  else if (name) parts.push(name)
+  else if (cnic) parts.push(cnic)
+  if (ref && ref !== name && !parts.some((p) => p === ref || p.endsWith(ref))) parts.push(ref)
+  for (const x of [e.category, e.trackingId].map((s) => s.trim()).filter(Boolean)) {
+    if (!parts.some((p) => p.includes(x))) parts.push(x)
+  }
+  return parts.join(' · ') || LEDGER_COL_DASH
+}
+
+function ledgerEntryAmounts(
+  srcTag: 'appl' | 'wepl' | 'gen',
+  sourceId: string,
+): { received: number; balance: number } | null {
+  if (srcTag === 'appl') {
+    const e = loadEntries().find((x) => x.id === sourceId)
+    if (!e) return null
+    return {
+      received: Math.round(entryPaidTowardSale(e) * 100) / 100,
+      balance: Math.round(entryLineDues(e) * 100) / 100,
+    }
+  }
+  if (srcTag === 'wepl') {
+    const l = loadWeaponAllotLines().find((x) => x.id === sourceId)
+    if (!l) return null
+    return {
+      received: Math.round(weaponLinePaidTowardSale(l) * 100) / 100,
+      balance: Math.round(lineDues(l) * 100) / 100,
+    }
+  }
+  const r = loadGeneralEntries().find((x) => x.id === sourceId)
+  if (!r) return null
+  return {
+    received: Math.round(generalDuesPaidAmount(r) * 100) / 100,
+    balance: Math.round(generalDuesRemaining(r) * 100) / 100,
+  }
+}
+
+function attachLedgerEntryAmounts(
+  row: ClientDuesLedgerRow,
+  srcTag: 'appl' | 'wepl' | 'gen',
+  sourceId: string,
+): ClientDuesLedgerRow {
+  const am = ledgerEntryAmounts(srcTag, sourceId)
+  if (!am) return { ...row, sourceId }
+  return {
+    ...row,
+    sourceId,
+    rowReceived: am.received,
+    rowBalance: am.balance,
+    hasOpenDues: am.balance > 0.001,
+  }
+}
+
+function ledgerColsFromDefaultRef(
+  kind: 'app' | 'weapon' | 'general',
+  defaultNameRef: string,
+): { colName: string; colReference: string; colClient: string } {
+  const parts = defaultNameRef.split(' / ').map((x) => x.trim()).filter(Boolean)
+  if (kind === 'app') {
+    return ledgerRowCols('appl', { reference: parts[1] || parts[0] || '', entryName: parts[0] })
+  }
+  if (kind === 'weapon') {
+    return ledgerRowCols('wepl', { client: parts[0] || '' })
+  }
+  return ledgerRowCols('gen', { generalName: parts[0] || '' })
 }
 
 function stmtNameRef(name: string, ref: string): string {
@@ -4435,6 +4636,140 @@ function entryDateInRange(entryDate: string, fromIso: string, toIso: string): bo
   return d >= fromIso && d <= toIso
 }
 
+function groupTotalPaidTowardSale(kind: 'app' | 'weapon' | 'general', groupKey: string): number {
+  if (kind === 'app') {
+    return loadEntries()
+      .filter((e) => appDuesGroupKey(e) === groupKey)
+      .reduce((s, e) => s + entryPaidTowardSale(e), 0)
+  }
+  if (kind === 'weapon') {
+    return loadWeaponAllotLines()
+      .filter((l) => ((l.client || '').trim() || '(No client)') === groupKey)
+      .reduce((s, l) => s + weaponLinePaidTowardSale(l), 0)
+  }
+  return loadGeneralEntries()
+    .filter((r) => r.kind === 'dues' && generalEntryGroupKey(r) === groupKey)
+    .reduce((s, r) => s + generalDuesPaidAmount(r), 0)
+}
+
+function groupTotalOutstanding(kind: 'app' | 'weapon' | 'general', groupKey: string): number {
+  if (kind === 'app') {
+    return loadEntries()
+      .filter((e) => appDuesGroupKey(e) === groupKey)
+      .reduce((s, e) => s + entryLineDues(e), 0)
+  }
+  if (kind === 'weapon') {
+    return loadWeaponAllotLines()
+      .filter((l) => ((l.client || '').trim() || '(No client)') === groupKey)
+      .reduce((s, l) => s + lineDues(l), 0)
+  }
+  return loadGeneralEntries()
+    .filter((r) => r.kind === 'dues' && generalEntryGroupKey(r) === groupKey)
+    .reduce((s, r) => s + generalDuesRemaining(r), 0)
+}
+
+/** On-record wasool: har entry/line ki alag credit row (ek din 10 credit = 10 lines). */
+function reconcileGroupLedgerRows(
+  rows: ClientDuesLedgerRow[],
+  kind: 'app' | 'weapon' | 'general',
+  groupKey: string,
+  srcTag: 'appl' | 'gen' | 'wepl',
+  defaultNameRef: string,
+  daySeqMap: Map<string, number>,
+): void {
+  const totalPaid = Math.round(groupTotalPaidTowardSale(kind, groupKey) * 100) / 100
+  const credited = Math.round(rows.reduce((s, r) => s + (r.credit != null ? r.credit : 0), 0) * 100) / 100
+  const gap = Math.round((totalPaid - credited) * 100) / 100
+  if (gap <= 0.001) return
+
+  type Part = {
+    paid: number
+    entryDate: string
+    nameRef: string
+    cols: { colName: string; colReference: string; colClient: string }
+    note: string
+    sourceId: string
+  }
+  const parts: Part[] = []
+  if (kind === 'app') {
+    for (const e of loadEntries()) {
+      if (appDuesGroupKey(e) !== groupKey) continue
+      const paid = entryPaidTowardSale(e)
+      if (paid <= 0.001) continue
+      const tid = (e.trackingId || '').trim()
+      parts.push({
+        paid,
+        entryDate: e.entryDate,
+        nameRef: stmtNameRef((e.name || '').trim() || '—', appEntryReferenceLabel(e)),
+        cols: ledgerRowCols('appl', {
+          reference: appEntryReferenceLabel(e),
+          entryName: (e.name || '').trim(),
+        }),
+        note: tid ? `Received (on record) — ${tid}` : 'Received (on record)',
+        sourceId: e.id,
+      })
+    }
+  } else if (kind === 'weapon') {
+    for (const l of loadWeaponAllotLines()) {
+      const k = (l.client || '').trim() || '(No client)'
+      if (k !== groupKey) continue
+      const paid = weaponLinePaidTowardSale(l)
+      if (paid <= 0.001) continue
+      const wn = (l.weaponNumber || '').trim()
+      parts.push({
+        paid,
+        entryDate: l.entryDate,
+        nameRef: stmtNameRef(k, wn || '—'),
+        cols: ledgerRowCols('wepl', { client: k }),
+        note: wn ? `Received (on record) — ${wn}` : 'Received (on record)',
+        sourceId: l.id,
+      })
+    }
+  } else {
+    for (const r of loadGeneralEntries()) {
+      if (r.kind !== 'dues' || generalEntryGroupKey(r) !== groupKey) continue
+      const paid = generalDuesPaidAmount(r)
+      if (paid <= 0.001) continue
+      parts.push({
+        paid,
+        entryDate: r.entryDate,
+        nameRef: stmtNameRef(generalEntryDisplayName(r), (r.description || '').trim() || '—'),
+        cols: ledgerRowCols('gen', { generalName: (r.name || '').trim() || generalEntryDisplayName(r) }),
+        note: (r.description || '').trim() || 'Received (on record)',
+        sourceId: r.id,
+      })
+    }
+  }
+
+  const totalPartsPaid = parts.reduce((s, p) => s + p.paid, 0)
+  if (totalPartsPaid <= 0.001) return
+
+  let remaining = gap
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]
+    let amt: number
+    if (i === parts.length - 1) {
+      amt = Math.round(remaining * 100) / 100
+    } else {
+      amt = Math.round(((gap * p.paid) / totalPartsPaid) * 100) / 100
+      remaining = Math.round((remaining - amt) * 100) / 100
+    }
+    if (amt <= 0.001) continue
+    const sortAt = nextLedgerSortAtForDay(daySeqMap, p.entryDate)
+    const creditRow: ClientDuesLedgerRow = {
+      sortAt,
+      date: formatDateTime12hFromSortAt(sortAt),
+      nameRef: p.nameRef || defaultNameRef,
+      ...p.cols,
+      note: p.note,
+      debit: null,
+      credit: amt,
+      srcTag,
+    }
+    rows.push(attachLedgerEntryAmounts(creditRow, srcTag, p.sourceId))
+  }
+}
+
 function buildClientDuesLedgerRows(opts: {
   kind: 'app' | 'weapon' | 'general'
   groupKey: string
@@ -4444,6 +4779,7 @@ function buildClientDuesLedgerRows(opts: {
   toIso: string
 }): ClientDuesLedgerRow[] {
   const rows: ClientDuesLedgerRow[] = []
+  const daySeqMap = new Map<string, number>()
   const clientName = opts.clientName.trim() || '—'
   const clientRef = opts.clientReference.trim() || '—'
   const defaultNameRef = stmtNameRef(clientName, clientRef)
@@ -4452,28 +4788,51 @@ function buildClientDuesLedgerRows(opts: {
     for (const r of loadGeneralEntries()) {
       if (r.kind !== 'dues' || generalEntryGroupKey(r) !== opts.groupKey) continue
       if (!entryDateInRange(r.entryDate, opts.fromIso, opts.toIso)) continue
-      rows.push({
-        sortAt: `${r.entryDate}T00:00:00`,
-        date: formatDateDisplay(r.entryDate),
-        nameRef: stmtNameRef(generalEntryDisplayName(r), clientRef),
-        note: r.description.trim() || '—',
-        debit: r.amount,
-        credit: null,
-      })
+      const sortAt = nextLedgerSortAtForDay(daySeqMap, r.entryDate)
+      rows.push(
+        attachLedgerEntryAmounts(
+          {
+            sortAt,
+            date: formatDateTime12hFromSortAt(sortAt),
+            nameRef: stmtNameRef(generalEntryDisplayName(r), clientRef),
+            ...ledgerRowCols('gen', {
+              generalName: (r.name || '').trim() || generalEntryDisplayName(r),
+            }),
+            note: r.description.trim() || '—',
+            debit: r.amount,
+            credit: null,
+            srcTag: 'gen',
+          },
+          'gen',
+          r.id,
+        ),
+      )
     }
   } else if (opts.kind === 'app') {
     for (const e of loadEntries()) {
       if (appDuesGroupKey(e) !== opts.groupKey) continue
       if (!entryDateInRange(e.entryDate, opts.fromIso, opts.toIso)) continue
       const noteParts = [e.trackingId, e.weaponNumber, e.category].map((x) => x.trim()).filter(Boolean)
-      rows.push({
-        sortAt: `${e.entryDate}T00:00:00`,
-        date: formatDateDisplay(e.entryDate),
-        nameRef: stmtNameRef((e.name || '').trim() || clientName, e.reference.trim() || e.category.trim() || clientRef),
-        note: noteLine(noteParts),
-        debit: e.salePrice,
-        credit: null,
-      })
+      const sortAt = nextLedgerSortAtForDay(daySeqMap, e.entryDate)
+      rows.push(
+        attachLedgerEntryAmounts(
+          {
+            sortAt,
+            date: formatDateTime12hFromSortAt(sortAt),
+            nameRef: stmtNameRef((e.name || '').trim() || clientName, e.reference.trim() || e.category.trim() || clientRef),
+            ...ledgerRowCols('appl', {
+              reference: appEntryReferenceLabel(e),
+              entryName: (e.name || '').trim() || clientName,
+            }),
+            note: noteLine(noteParts),
+            debit: e.salePrice,
+            credit: null,
+            srcTag: 'appl',
+          },
+          'appl',
+          e.id,
+        ),
+      )
     }
   } else {
     for (const l of loadWeaponAllotLines()) {
@@ -4481,14 +4840,23 @@ function buildClientDuesLedgerRows(opts: {
       if (k !== opts.groupKey) continue
       if (!entryDateInRange(l.entryDate, opts.fromIso, opts.toIso)) continue
       const wn = (l.weaponNumber || '').trim()
-      rows.push({
-        sortAt: `${l.entryDate}T00:00:00`,
-        date: formatDateDisplay(l.entryDate),
-        nameRef: stmtNameRef(k, wn || clientRef),
-        note: wn || '—',
-        debit: l.salePrice,
-        credit: null,
-      })
+      const sortAt = nextLedgerSortAtForDay(daySeqMap, l.entryDate)
+      rows.push(
+        attachLedgerEntryAmounts(
+          {
+            sortAt,
+            date: formatDateTime12hFromSortAt(sortAt),
+            nameRef: stmtNameRef(k, wn || clientRef),
+            ...ledgerRowCols('wepl', { client: k }),
+            note: wn || '—',
+            debit: l.salePrice,
+            credit: null,
+            srcTag: 'wepl',
+          },
+          'wepl',
+          l.id,
+        ),
+      )
     }
   }
   for (const log of loadDuesPaymentLogs()) {
@@ -4497,15 +4865,30 @@ function buildClientDuesLedgerRows(opts: {
     const payNote = (log.note ?? '').trim() || 'Wasool'
     rows.push({
       sortAt: log.paidAt,
-      date: formatDateDisplay(duesPaymentLogDateIso(log.paidAt)),
+      date: formatDateTime12hFromSortAt(log.paidAt),
       nameRef: defaultNameRef,
+      ...ledgerColsFromDefaultRef(opts.kind, defaultNameRef),
       note: payNote,
       debit: null,
       credit: log.amount,
+      srcTag: opts.kind === 'app' ? 'appl' : opts.kind === 'general' ? 'gen' : 'wepl',
+      rowReceived: Math.round(log.amount * 100) / 100,
+      rowBalance: null,
     })
   }
-  rows.sort((a, b) => a.sortAt.localeCompare(b.sortAt) || a.note.localeCompare(b.note))
+  const srcTag = opts.kind === 'app' ? 'appl' : opts.kind === 'general' ? 'gen' : 'wepl'
+  reconcileGroupLedgerRows(rows, opts.kind, opts.groupKey, srcTag, defaultNameRef, daySeqMap)
+  rows.sort((a, b) => compareLedgerRows(a, b))
   return rows
+}
+
+function compareLedgerRows(a: ClientDuesLedgerRow, b: ClientDuesLedgerRow): number {
+  const c = a.sortAt.localeCompare(b.sortAt)
+  if (c !== 0) return c
+  const da = a.debit != null ? 0 : 1
+  const db = b.debit != null ? 0 : 1
+  if (da !== db) return da - db
+  return a.note.localeCompare(b.note)
 }
 
 function clientDetailSrcTag(kind: 'app' | 'weapon' | 'general'): 'appl' | 'gen' | 'wepl' {
@@ -4543,75 +4926,149 @@ function clientDetailGroupMeta(h: ClientDetailHit): {
 }
 
 function buildClientSearchLedgerRows(hits: ClientDetailHit[], fromIso: string, toIso: string): ClientDuesLedgerRow[] {
-  const rows: ClientDuesLedgerRow[] = []
   const noteLine = (parts: string[]) => parts.map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
-  const groups = new Map<string, { kind: 'app' | 'weapon' | 'general'; defaultNameRef: string }>()
+  const groups = new Map<string, { kind: 'app' | 'weapon' | 'general'; groupKey: string; defaultNameRef: string }>()
+  const rows: ClientDuesLedgerRow[] = []
 
   for (const h of hits) {
     const meta = clientDetailGroupMeta(h)
     const mapKey = `${meta.kind}:${meta.groupKey}`
-    if (!groups.has(mapKey)) groups.set(mapKey, { kind: meta.kind, defaultNameRef: meta.nameRef })
-
-    if (h.kind === 'app') {
-      const e = h.entry
-      if (!entryDateInRange(e.entryDate, fromIso, toIso)) continue
-      const noteParts = [e.trackingId, e.weaponNumber, e.category].map((x) => x.trim()).filter(Boolean)
-      rows.push({
-        sortAt: `${e.entryDate}T00:00:00`,
-        date: formatDateDisplay(e.entryDate),
-        nameRef: meta.nameRef,
-        note: noteLine(noteParts),
-        debit: e.salePrice,
-        credit: null,
-        srcTag: 'appl',
-      })
-    } else if (h.kind === 'weapon') {
-      const l = h.line
-      if (!entryDateInRange(l.entryDate, fromIso, toIso)) continue
-      const wn = (l.weaponNumber || '').trim()
-      rows.push({
-        sortAt: `${l.entryDate}T00:00:00`,
-        date: formatDateDisplay(l.entryDate),
-        nameRef: meta.nameRef,
-        note: wn || '—',
-        debit: l.salePrice,
-        credit: null,
-        srcTag: 'wepl',
-      })
-    } else {
-      const r = h.row
-      if (!entryDateInRange(r.entryDate, fromIso, toIso)) continue
-      rows.push({
-        sortAt: `${r.entryDate}T00:00:00`,
-        date: formatDateDisplay(r.entryDate),
-        nameRef: meta.nameRef,
-        note: r.description.trim() || '—',
-        debit: r.amount,
-        credit: null,
-        srcTag: 'gen',
-      })
+    if (!groups.has(mapKey)) {
+      groups.set(mapKey, { kind: meta.kind, groupKey: meta.groupKey, defaultNameRef: meta.nameRef })
     }
   }
 
-  for (const log of loadDuesPaymentLogs()) {
-    const mapKey = `${log.kind}:${log.groupKey}`
-    const g = groups.get(mapKey)
-    if (!g) continue
-    if (!duesPaymentLogInRange(log, fromIso, toIso)) continue
-    const payNote = (log.note ?? '').trim() || 'Wasool'
-    rows.push({
-      sortAt: log.paidAt,
-      date: formatDateDisplay(duesPaymentLogDateIso(log.paidAt)),
-      nameRef: g.defaultNameRef,
-      note: payNote,
-      debit: null,
-      credit: log.amount,
-      srcTag: clientDetailSrcTag(log.kind),
-    })
+  for (const [, g] of groups) {
+    const chunk: ClientDuesLedgerRow[] = []
+    const daySeqMap = new Map<string, number>()
+    const srcTag = clientDetailSrcTag(g.kind)
+    const mapKey = `${g.kind}:${g.groupKey}`
+
+    for (const h of hits) {
+      const meta = clientDetailGroupMeta(h)
+      if (`${meta.kind}:${meta.groupKey}` !== mapKey) continue
+      if (h.kind === 'app') {
+        const e = h.entry
+        if (!entryDateInRange(e.entryDate, fromIso, toIso)) continue
+        const noteParts = [e.trackingId, e.weaponNumber, e.category].map((x) => x.trim()).filter(Boolean)
+        const sortAt = nextLedgerSortAtForDay(daySeqMap, e.entryDate)
+        chunk.push(
+          attachLedgerEntryAmounts(
+            {
+              sortAt,
+              date: formatDateTime12hFromSortAt(sortAt),
+              nameRef: meta.nameRef,
+              ...ledgerRowCols('appl', {
+                reference: appEntryReferenceLabel(e),
+                entryName: (e.name || '').trim(),
+              }),
+              note: noteLine(noteParts),
+              debit: e.salePrice,
+              credit: null,
+              srcTag: 'appl',
+            },
+            'appl',
+            e.id,
+          ),
+        )
+      } else if (h.kind === 'weapon') {
+        const l = h.line
+        if (!entryDateInRange(l.entryDate, fromIso, toIso)) continue
+        const wn = (l.weaponNumber || '').trim()
+        const wClient = (l.client || '').trim() || '(No client)'
+        const sortAt = nextLedgerSortAtForDay(daySeqMap, l.entryDate)
+        chunk.push(
+          attachLedgerEntryAmounts(
+            {
+              sortAt,
+              date: formatDateTime12hFromSortAt(sortAt),
+              nameRef: meta.nameRef,
+              ...ledgerRowCols('wepl', { client: wClient }),
+              note: wn || '—',
+              debit: l.salePrice,
+              credit: null,
+              srcTag: 'wepl',
+            },
+            'wepl',
+            l.id,
+          ),
+        )
+      } else {
+        const r = h.row
+        if (!entryDateInRange(r.entryDate, fromIso, toIso)) continue
+        const sortAt = nextLedgerSortAtForDay(daySeqMap, r.entryDate)
+        chunk.push(
+          attachLedgerEntryAmounts(
+            {
+              sortAt,
+              date: formatDateTime12hFromSortAt(sortAt),
+              nameRef: meta.nameRef,
+              ...ledgerRowCols('gen', {
+                generalName: (r.name || '').trim() || generalEntryDisplayName(r),
+              }),
+              note: r.description.trim() || '—',
+              debit: r.amount,
+              credit: null,
+              srcTag: 'gen',
+            },
+            'gen',
+            r.id,
+          ),
+        )
+      }
+    }
+
+    for (const log of loadDuesPaymentLogs()) {
+      if (`${log.kind}:${log.groupKey}` !== mapKey) continue
+      if (!duesPaymentLogInRange(log, fromIso, toIso)) continue
+      const payNote = (log.note ?? '').trim() || 'Wasool'
+      chunk.push({
+        sortAt: log.paidAt,
+        date: formatDateTime12hFromSortAt(log.paidAt),
+        nameRef: g.defaultNameRef,
+        ...ledgerColsFromDefaultRef(g.kind, g.defaultNameRef),
+        note: payNote,
+        debit: null,
+        credit: log.amount,
+        srcTag,
+        rowReceived: Math.round(log.amount * 100) / 100,
+        rowBalance: null,
+      })
+    }
+
+    reconcileGroupLedgerRows(chunk, g.kind, g.groupKey, srcTag, g.defaultNameRef, daySeqMap)
+    rows.push(...chunk)
   }
 
-  rows.sort((a, b) => a.sortAt.localeCompare(b.sortAt) || a.note.localeCompare(b.note))
+  rows.sort((a, b) => compareLedgerRows(a, b))
   return rows
+}
+
+function computeClientDetailOutstanding(hits: ClientDetailHit[]): number {
+  const seen = new Set<string>()
+  let t = 0
+  for (const h of hits) {
+    const meta = clientDetailGroupMeta(h)
+    const k = `${meta.kind}:${meta.groupKey}`
+    if (seen.has(k)) continue
+    seen.add(k)
+    t += groupTotalOutstanding(meta.kind, meta.groupKey)
+  }
+  return Math.round(t * 100) / 100
+}
+
+function clientDetailAllTimeRange(hits: ClientDetailHit[]): { fromIso: string; toIso: string } {
+  let min = ''
+  let max = isoToday()
+  for (const h of hits) {
+    const d =
+      h.kind === 'app' ? h.entry.entryDate : h.kind === 'weapon' ? h.line.entryDate : h.row.entryDate
+    if (!d) continue
+    if (!min || d < min) min = d
+    if (d > max) max = d
+  }
+  if (!min) min = max
+  return { fromIso: min, toIso: max }
 }
 
 function printClientLedgerDocument(opts: {
@@ -4620,28 +5077,48 @@ function printClientLedgerDocument(opts: {
   clientLine: string
   ledger: ClientDuesLedgerRow[]
   showSrcCol: boolean
+  /** Pending dues (abhi) — same as Pending Dues screen when set */
+  outstandingBalance?: number
 }) {
   const esc = escHtml
   const now = new Date()
   const sumDebit = opts.ledger.reduce((s, r) => s + (r.debit != null ? r.debit : 0), 0)
   const sumCredit = opts.ledger.reduce((s, r) => s + (r.credit != null ? r.credit : 0), 0)
   const stmtBalance = Math.round((sumDebit - sumCredit) * 100) / 100
+  const balanceShow =
+    opts.outstandingBalance != null ? Math.round(opts.outstandingBalance * 100) / 100 : stmtBalance
   let idx = 0
   const srcTh = opts.showSrcCol ? `<th class="col-src">Cat</th>` : ''
-  const srcCol = opts.showSrcCol ? `<col style="width:5%" />` : ''
-  const colspan = opts.showSrcCol ? 7 : 6
+  const srcCol = opts.showSrcCol ? `<col style="width:4%" />` : ''
+  const nameColsTh = opts.showSrcCol
+    ? `<th class="col-name">Name</th><th class="col-ref">Reference</th><th class="col-client">Client</th>`
+    : `<th class="col-nameref">Name / Reference</th>`
+  const nameColsCol = opts.showSrcCol
+    ? `<col style="width:10%" /><col style="width:14%" /><col style="width:10%" />`
+    : `<col style="width:20%" />`
+  const entryAmtTh = opts.showSrcCol ? `<th class="num">Received</th><th class="num">Balance</th>` : ''
+  const entryAmtCol = opts.showSrcCol ? `<col style="width:9%" /><col style="width:9%" />` : ''
+  const colspan = opts.showSrcCol ? 11 : 6
   const trs = opts.ledger
     .map((r) => {
       idx += 1
       const srcTd = opts.showSrcCol
         ? `<td class="col-src">${esc(r.srcTag ?? '—')}</td>`
         : ''
-      return `<tr>
+      const nameTds = opts.showSrcCol
+        ? `<td class="col-name">${esc(r.colName)}</td><td class="col-ref">${esc(r.colReference)}</td><td class="col-client">${esc(r.colClient)}</td>`
+        : `<td class="col-nameref">${esc(r.nameRef)}</td>`
+      const entryAmtTds = opts.showSrcCol
+        ? `<td class="num">${esc(stmtPrintRowReceivedBal(r.rowReceived))}</td><td class="num">${esc(stmtPrintRowReceivedBal(r.rowBalance))}</td>`
+        : ''
+      const rowCls = r.hasOpenDues ? ' class="row-open-dues"' : ''
+      return `<tr${rowCls}>
         <td class="col-srl">${idx}</td>
         ${srcTd}
         <td class="col-date">${esc(r.date)}</td>
-        <td class="col-nameref">${esc(r.nameRef)}</td>
+        ${nameTds}
         <td class="col-note">${esc(r.note)}</td>
+        ${entryAmtTds}
         <td class="num">${esc(stmtPrintDebitCredit(r.debit))}</td>
         <td class="num">${esc(stmtPrintDebitCredit(r.credit))}</td>
       </tr>`
@@ -4669,11 +5146,11 @@ function printClientLedgerDocument(opts: {
   <div class="stmt-table-wrap">
   <table class="stmt-table">
     <colgroup>
-      <col style="width:5%" />${srcCol}<col style="width:10%" /><col style="width:20%" /><col style="width:24%" />
-      <col style="width:14%" /><col style="width:14%" />
+      <col style="width:3%" />${srcCol}<col style="width:8%" />${nameColsCol}<col style="width:12%" />${entryAmtCol}
+      <col style="width:10%" /><col style="width:10%" />
     </colgroup>
     <thead><tr>
-      <th class="col-srl">Srl No</th>${srcTh}<th class="col-date">Date</th><th class="col-nameref">Name / Reference</th><th class="col-note">Note</th>
+      <th class="col-srl">Srl No</th>${srcTh}<th class="col-date">Date &amp; Time</th>${nameColsTh}<th class="col-note">Note</th>${entryAmtTh}
       <th class="num">Debit</th><th class="num">Credit</th>
     </tr></thead>
     <tbody>${trs || `<tr><td colspan="${colspan}">—</td></tr>`}</tbody>
@@ -4684,7 +5161,7 @@ function printClientLedgerDocument(opts: {
       <div class="fin-title">SUMMARY</div>
       <div class="fin-row"><span>Total Debit</span><span>${esc(stmtPrintMoney(sumDebit))}</span></div>
       <div class="fin-row"><span>Total Credit</span><span>${esc(stmtPrintMoney(sumCredit))}</span></div>
-      <div class="fin-row net"><span>Balance (baqi)</span><span>${esc(stmtPrintMoney(stmtBalance))}</span></div>
+      <div class="fin-row net"><span>Balance (baqi)</span><span>${esc(stmtPrintMoney(balanceShow))}</span></div>
     </div>
   </div>
   <div class="foot"><div>*** This is a Computer Generated Print ***</div><div class="p2">POWERED BY GUL CORPORATION LLC</div></div>
@@ -4701,6 +5178,18 @@ function stmtPrintMoney(n: number | null | undefined): string {
 function stmtPrintDebitCredit(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.001) return '—'
   return formatInvoiceRupee(n)
+}
+
+function stmtPrintRowReceivedBal(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return stmtPrintMoney(n)
+}
+
+function refreshLedgerRowAmounts(rows: ClientDuesLedgerRow[]): ClientDuesLedgerRow[] {
+  return rows.map((r) => {
+    if (!r.sourceId || !r.srcTag) return r
+    return attachLedgerEntryAmounts(r, r.srcTag, r.sourceId)
+  })
 }
 
 const PRINT_CLIENT_LEDGER_CSS = `
@@ -4726,7 +5215,9 @@ const PRINT_CLIENT_LEDGER_CSS = `
   .stmt-table .col-srl{text-align:center;white-space:nowrap;}
   .stmt-table .col-src{text-align:center;white-space:nowrap;font-weight:700;text-transform:lowercase;}
   .stmt-table .col-date{white-space:nowrap;font-size:9px;}
-  .stmt-table .col-nameref,.stmt-table .col-note{word-break:break-word;overflow-wrap:break-word;line-height:1.25;}
+  .stmt-table .col-nameref,.stmt-table .col-name,.stmt-table .col-ref,.stmt-table .col-client,.stmt-table .col-note{word-break:break-word;overflow-wrap:break-word;line-height:1.25;}
+  .stmt-table tr.row-open-dues td{background:#fecaca !important;color:#991b1b;font-weight:700;}
+  .stmt-table tr.row-open-dues td.num{color:#991b1b;}
   .fin-wrap{display:flex;justify-content:flex-end;margin-top:20px;width:100%;}
   .fin-box{width:240px;max-width:42%;border:2px solid #000;flex-shrink:0;}
   .fin-title{text-align:center;font-weight:700;font-size:10px;padding:6px 8px;border-bottom:1px solid #000;}
@@ -4790,9 +5281,7 @@ function duesModalCollectFooterHtml(withPrint: boolean): string {
 }
 
 function formatPaidDateTime(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return `${formatHeaderDate(d)} ${formatHeaderTime(d)}`
+  return formatDateTime12hFromSortAt(iso)
 }
 
 function renderDuesPayHistBody(el: HTMLElement | null, kind: 'app' | 'weapon' | 'general', groupKey: string) {
@@ -5773,7 +6262,7 @@ function makeNewEntry(
   syncUrgencyFields()
   updateTotals()
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault()
     const sp = parseNumOrNull(salePrice.value)
     const cr = parseNumOrNull(cashReceived.value)
@@ -5788,7 +6277,7 @@ function makeNewEntry(
       entryDate: entryDate.value || now.toISOString().slice(0, 10),
       name: name.value.trim(),
       fatherName: fatherName.value.trim(),
-      cnic: cnic.value.trim(),
+      cnic: formatCnicDigits(cnic.value.trim()),
       trackingId: trackingId.value.trim(),
       reference: reference.value.trim(),
       weaponNumber: weaponNumber.value.trim(),
@@ -5802,6 +6291,12 @@ function makeNewEntry(
       urgency: u,
       urgentDays: urgentN,
       otherReminderDays: otherN,
+    }
+
+    const dupMatches = findDuplicateEntries(core.name, core.cnic, initial?.id)
+    if (dupMatches.length > 0) {
+      const proceed = await confirmProceedDespiteDuplicateEntry(dupMatches, Boolean(initial))
+      if (!proceed) return
     }
 
     if (initial) {
@@ -6118,10 +6613,103 @@ function matchesClientDetailSearch(qRaw: string, parts: string[]): boolean {
   return tokens.every((t) => blob.includes(t))
 }
 
+type ClientDetailSuggest = {
+  label: string
+  field: 'name' | 'reference' | 'client'
+  src: 'appl' | 'wepl' | 'gen'
+}
+
+function clientDetailSuggestHint(s: ClientDetailSuggest): string {
+  const field =
+    s.field === 'name' ? 'Name' : s.field === 'reference' ? 'Reference' : 'Client'
+  return `${field} · ${s.src}`
+}
+
+/** Unique name / reference / client strings for search autocomplete (all records). */
+function buildClientDetailSearchSuggestions(): ClientDetailSuggest[] {
+  const seen = new Set<string>()
+  const out: ClientDetailSuggest[] = []
+  const add = (raw: string, field: ClientDetailSuggest['field'], src: ClientDetailSuggest['src']) => {
+    const label = raw.trim()
+    if (!label || label === '—') return
+    const key = `${src}:${field}:${label.toLowerCase()}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push({ label, field, src })
+  }
+
+  for (const e of loadEntries()) {
+    add(e.name, 'name', 'appl')
+    add(e.reference, 'reference', 'appl')
+    add(e.cnic, 'reference', 'appl')
+    add(e.trackingId, 'reference', 'appl')
+    add(e.category, 'reference', 'appl')
+  }
+  for (const l of loadWeaponAllotLines()) {
+    add(l.client || '', 'client', 'wepl')
+  }
+  for (const r of loadGeneralEntries()) {
+    if (r.kind !== 'dues') continue
+    add(r.name, 'name', 'gen')
+    add(r.description, 'name', 'gen')
+    add(generalEntryDisplayName(r), 'name', 'gen')
+  }
+
+  out.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  return out
+}
+
+function filterClientDetailSuggestions(
+  query: string,
+  all: ClientDetailSuggest[],
+): ClientDetailSuggest[] {
+  const n = query.trim().toLowerCase()
+  if (!n) return []
+  const tokens = n.split(/\s+/).filter(Boolean)
+  if (!tokens.length) return []
+
+  const matched = all.filter((s) => {
+    const blob = s.label.toLowerCase()
+    return tokens.every((t) => blob.includes(t))
+  })
+
+  matched.sort((a, b) => {
+    const al = a.label.toLowerCase()
+    const bl = b.label.toLowerCase()
+    const aPri = al.startsWith(n) ? 0 : tokens.every((t) => al.startsWith(t)) ? 1 : 2
+    const bPri = bl.startsWith(n) ? 0 : tokens.every((t) => bl.startsWith(t)) ? 1 : 2
+    if (aPri !== bPri) return aPri - bPri
+    return al.localeCompare(bl, undefined, { sensitivity: 'base' })
+  })
+  return matched.slice(0, 30)
+}
+
 function collectClientDetailHits(query: string): ClientDetailHit[] {
   const out: ClientDetailHit[] = []
   const q = query
   if (!q.trim()) return out
+  const hitIds = new Set<string>()
+  const linkKeys = new Set<string>()
+
+  const pushHit = (h: ClientDetailHit) => {
+    const id = h.kind === 'app' ? `app:${h.entry.id}` : h.kind === 'weapon' ? `wep:${h.line.id}` : `gen:${h.row.id}`
+    if (hitIds.has(id)) return
+    hitIds.add(id)
+    out.push(h)
+    if (h.kind === 'app') {
+      const n = h.entry.name.trim().toLowerCase()
+      const r = h.entry.reference.trim().toLowerCase()
+      if (n) linkKeys.add(n)
+      if (r) linkKeys.add(r)
+    } else if (h.kind === 'weapon') {
+      const c = (h.line.client || '').trim().toLowerCase()
+      if (c) linkKeys.add(c)
+    } else {
+      const n = h.row.name.trim().toLowerCase()
+      if (n) linkKeys.add(n)
+    }
+  }
+
   for (const e of loadEntries()) {
     const parts = [
       e.name,
@@ -6134,15 +6722,32 @@ function collectClientDetailHits(query: string): ClientDetailHit[] {
       e.category,
       e.weaponNumber,
     ]
-    if (matchesClientDetailSearch(q, parts)) out.push({ kind: 'app', entry: e })
+    if (matchesClientDetailSearch(q, parts)) pushHit({ kind: 'app', entry: e })
   }
   for (const l of loadWeaponAllotLines()) {
-    if (matchesClientDetailSearch(q, [l.client, l.weaponNumber])) out.push({ kind: 'weapon', line: l })
+    if (matchesClientDetailSearch(q, [l.client, l.weaponNumber])) pushHit({ kind: 'weapon', line: l })
   }
   for (const r of loadGeneralEntries()) {
     if (r.kind !== 'dues') continue
-    if (matchesClientDetailSearch(q, [r.name, r.description])) out.push({ kind: 'general', row: r })
+    if (matchesClientDetailSearch(q, [r.name, r.description])) pushHit({ kind: 'general', row: r })
   }
+
+  for (const key of linkKeys) {
+    if (!key) continue
+    for (const e of loadEntries()) {
+      const parts = [e.name, e.reference, e.cnic, e.trackingId]
+      if (parts.some((p) => (p || '').trim().toLowerCase().includes(key))) pushHit({ kind: 'app', entry: e })
+    }
+    for (const l of loadWeaponAllotLines()) {
+      if ((l.client || '').trim().toLowerCase().includes(key)) pushHit({ kind: 'weapon', line: l })
+    }
+    for (const r of loadGeneralEntries()) {
+      if (r.kind !== 'dues') continue
+      const parts = [r.name, r.description]
+      if (parts.some((p) => (p || '').trim().toLowerCase().includes(key))) pushHit({ kind: 'general', row: r })
+    }
+  }
+
   out.sort((a, b) => {
     const da = a.kind === 'app' ? a.entry.entryDate : a.kind === 'weapon' ? a.line.entryDate : a.row.entryDate
     const db = b.kind === 'app' ? b.entry.entryDate : b.kind === 'weapon' ? b.line.entryDate : b.row.entryDate
@@ -6155,33 +6760,272 @@ function collectClientDetailHits(query: string): ClientDetailHit[] {
   return out
 }
 
-async function printClientDetailStatement(query: string) {
-  const q = query.trim()
-  if (!q) {
-    window.alert('Enter a search term first, then click Print.')
-    return
-  }
-  const hits = collectClientDetailHits(q)
-  if (!hits.length) {
-    window.alert('No matching records for this search.')
-    return
-  }
-  const range = await promptDateRangeModal({
-    title: 'Client detail print',
-    subtitle: 'From — To date range select karein.',
-  })
-  if (!range) return
-  const ledger = buildClientSearchLedgerRows(hits, range.fromIso, range.toIso)
+function renderClientDetailLedgerTableHtml(ledger: ClientDuesLedgerRow[]): string {
+  const esc = escHtml
   if (!ledger.length) {
-    window.alert('Is date range mein koi record nahi mila.')
-    return
+    return `<tr><td colspan="10" class="empty">No ledger rows for this search.</td></tr>`
   }
-  printClientLedgerDocument({
-    title: `Client detail — ${q}`,
-    subTitle: 'CLIENT DETAIL STATEMENT',
-    clientLine: `Search: ${q} | Period: ${range.fromIso} → ${range.toIso} | appl · wepl · gen`,
-    ledger,
-    showSrcCol: true,
+  return ledger
+    .map((r) => {
+      const rowCls = r.hasOpenDues ? ' class="row-open-dues"' : ''
+      const recv =
+        r.rowReceived != null
+          ? formatRs(r.rowReceived)
+          : r.credit != null && r.credit > 0
+            ? formatRs(r.credit)
+            : '—'
+      const bal = r.rowBalance != null ? formatRs(r.rowBalance) : '—'
+      return `<tr${rowCls}>
+        <td>${esc(r.srcTag ?? '—')}</td>
+        <td>${esc(r.date)}</td>
+        <td>${esc(r.colName)}</td>
+        <td>${esc(r.colReference)}</td>
+        <td>${esc(r.colClient)}</td>
+        <td>${esc(r.note)}</td>
+        <td class="num">${esc(recv)}</td>
+        <td class="num">${esc(bal)}</td>
+        <td class="num">${esc(r.debit != null ? formatRs(r.debit) : '—')}</td>
+        <td class="num">${esc(r.credit != null ? formatRs(r.credit) : '—')}</td>
+      </tr>`
+    })
+    .join('')
+}
+
+function openClientDetailStatementModal(opts: { onRefresh?: () => void }) {
+  if (document.querySelector('.client-stmt-modal-overlay')) return
+  const overlay = makeEl('div', { className: 'dues-modal-overlay client-stmt-modal-overlay' })
+  const modal = makeEl('div', { className: 'client-stmt-modal' })
+  overlay.append(modal)
+  document.body.append(overlay)
+
+  const tearDown = () => {
+    document.removeEventListener('keydown', onEscKey, true)
+    if (overlay.isConnected) overlay.remove()
+  }
+  const onEscKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      if (modal.querySelector('.client-stmt-suggest.is-open')) return
+      e.preventDefault()
+      tearDown()
+    }
+  }
+  document.addEventListener('keydown', onEscKey, true)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) tearDown()
+  })
+
+  modal.innerHTML = `
+    <div class="client-stmt-hd">
+      <div class="client-stmt-title">Client Detail Statement</div>
+      <button type="button" class="btn ghost sm client-stmt-close" aria-label="Close">✕</button>
+    </div>
+    <div class="client-stmt-search-row">
+      <label class="client-stmt-lbl">Search (name · reference · weapon client · general)</label>
+      <div class="client-stmt-search-wrap">
+        <input type="search" class="in client-stmt-search-in" spellcheck="false" autocomplete="off" placeholder="e.g. adnan — type karke list se select karein" />
+        <div class="client-stmt-suggest" role="listbox" aria-label="Search suggestions"></div>
+      </div>
+      <button type="button" class="btn primary client-stmt-go">${ICON_SEARCH}<span>Search</span></button>
+    </div>
+    <div class="client-stmt-summary"></div>
+    <div class="client-stmt-table-wrap table">
+      <table class="client-stmt-table">
+        <thead>
+          <tr>
+            <th>Cat</th><th>Date &amp; Time</th><th>Name</th><th>Reference</th><th>Client</th><th>Note</th><th>Received</th><th>Balance</th><th>Debit</th><th>Credit</th>
+          </tr>
+        </thead>
+        <tbody class="client-stmt-tbody"></tbody>
+      </table>
+    </div>
+    <div class="client-stmt-fin"></div>
+    <div class="client-stmt-actions">
+      <button type="button" class="btn primary client-stmt-print">${ICON_RECEIPT}<span>Print statement</span></button>
+      <button type="button" class="btn ghost client-stmt-close2">Close</button>
+    </div>`
+
+  const searchIn = modal.querySelector<HTMLInputElement>('.client-stmt-search-in')!
+  const suggestEl = modal.querySelector<HTMLDivElement>('.client-stmt-suggest')!
+  const summaryEl = modal.querySelector<HTMLDivElement>('.client-stmt-summary')!
+  const tbody = modal.querySelector<HTMLTableSectionElement>('.client-stmt-tbody')!
+  const finEl = modal.querySelector<HTMLDivElement>('.client-stmt-fin')!
+  const esc = escHtml
+  const allSuggestions = buildClientDetailSearchSuggestions()
+
+  let lastHits: ClientDetailHit[] = []
+  let lastLedger: ClientDuesLedgerRow[] = []
+  let suggestItems: ClientDetailSuggest[] = []
+  let suggestActive = -1
+
+  const closeSuggest = () => {
+    suggestActive = -1
+    suggestEl.classList.remove('is-open')
+    suggestEl.innerHTML = ''
+    suggestEl.removeAttribute('aria-activedescendant')
+  }
+
+  const renderSuggest = (q: string) => {
+    suggestItems = filterClientDetailSuggestions(q, allSuggestions)
+    suggestActive = -1
+    if (!q.trim() || !suggestItems.length) {
+      closeSuggest()
+      return
+    }
+    suggestEl.innerHTML = suggestItems
+      .map((s, i) => {
+        const hint = clientDetailSuggestHint(s)
+        return `<button type="button" class="client-stmt-suggest-item" role="option" id="client-stmt-sug-${i}" data-idx="${i}">
+          <span class="client-stmt-suggest-label">${esc(s.label)}</span>
+          <span class="client-stmt-suggest-hint">${esc(hint)}</span>
+        </button>`
+      })
+      .join('')
+    suggestEl.classList.add('is-open')
+  }
+
+  const highlightSuggest = (idx: number) => {
+    suggestActive = idx
+    suggestEl.querySelectorAll<HTMLButtonElement>('.client-stmt-suggest-item').forEach((btn, i) => {
+      btn.classList.toggle('is-active', i === idx)
+      if (i === idx) {
+        suggestEl.setAttribute('aria-activedescendant', btn.id)
+        btn.scrollIntoView({ block: 'nearest' })
+      }
+    })
+    if (idx < 0) suggestEl.removeAttribute('aria-activedescendant')
+  }
+
+  const pickSuggestion = (s: ClientDetailSuggest) => {
+    searchIn.value = s.label
+    closeSuggest()
+    runSearch()
+  }
+
+  const runSearch = () => {
+    closeSuggest()
+    const q = searchIn.value.trim()
+    if (!q) {
+      lastHits = []
+      lastLedger = []
+      summaryEl.textContent = 'Name likhein — application, weapon allot, aur general dues teeno check honge.'
+      tbody.innerHTML = `<tr><td colspan="10" class="empty">Search karein.</td></tr>`
+      finEl.innerHTML = ''
+      return
+    }
+    lastHits = collectClientDetailHits(q)
+    if (!lastHits.length) {
+      lastLedger = []
+      summaryEl.textContent = `Search: "${q}" — koi record nahi mila.`
+      tbody.innerHTML = `<tr><td colspan="10" class="empty">No matching records.</td></tr>`
+      finEl.innerHTML = ''
+      return
+    }
+    const range = clientDetailAllTimeRange(lastHits)
+    lastLedger = refreshLedgerRowAmounts(
+      buildClientSearchLedgerRows(lastHits, range.fromIso, range.toIso),
+    )
+    const sumDebit = lastLedger.reduce((s, r) => s + (r.debit != null ? r.debit : 0), 0)
+    const sumCredit = lastLedger.reduce((s, r) => s + (r.credit != null ? r.credit : 0), 0)
+    const outstanding = computeClientDetailOutstanding(lastHits)
+    const appl = lastHits.filter((h) => h.kind === 'app').length
+    const wepl = lastHits.filter((h) => h.kind === 'weapon').length
+    const gen = lastHits.filter((h) => h.kind === 'general').length
+    summaryEl.textContent = `Search: "${q}" | appl ${appl} · wepl ${wepl} · gen ${gen} | Period: ${range.fromIso} → ${range.toIso}`
+    tbody.innerHTML = renderClientDetailLedgerTableHtml(lastLedger)
+    finEl.innerHTML = `
+      <div class="client-stmt-fin-box">
+        <div class="client-stmt-fin-row"><span>Total Debit</span><b>${esc(formatRs(sumDebit))}</b></div>
+        <div class="client-stmt-fin-row"><span>Total Credit</span><b>${esc(formatRs(sumCredit))}</b></div>
+        <div class="client-stmt-fin-row client-stmt-fin-baqi"><span>Balance (baqi) — Pending Dues jaisa</span><b>${esc(formatRs(outstanding))}</b></div>
+      </div>`
+  }
+
+  searchIn.addEventListener('input', () => renderSuggest(searchIn.value))
+  searchIn.addEventListener('focus', () => {
+    if (searchIn.value.trim()) renderSuggest(searchIn.value)
+  })
+  searchIn.addEventListener('blur', () => {
+    window.setTimeout(() => closeSuggest(), 160)
+  })
+  searchIn.addEventListener('keydown', (ev) => {
+    const open = suggestEl.classList.contains('is-open')
+    if (ev.key === 'ArrowDown' && open) {
+      ev.preventDefault()
+      highlightSuggest(Math.min(suggestActive + 1, suggestItems.length - 1))
+      return
+    }
+    if (ev.key === 'ArrowUp' && open) {
+      ev.preventDefault()
+      highlightSuggest(Math.max(suggestActive - 1, 0))
+      return
+    }
+    if (ev.key === 'Escape') {
+      if (open) {
+        ev.preventDefault()
+        ev.stopPropagation()
+        closeSuggest()
+      }
+      return
+    }
+    if (ev.key === 'Enter') {
+      if (open && suggestActive >= 0 && suggestItems[suggestActive]) {
+        ev.preventDefault()
+        pickSuggestion(suggestItems[suggestActive])
+        return
+      }
+      closeSuggest()
+      runSearch()
+    }
+  })
+  suggestEl.addEventListener('mousedown', (ev) => ev.preventDefault())
+  suggestEl.addEventListener('click', (ev) => {
+    const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('.client-stmt-suggest-item')
+    if (!btn) return
+    const idx = Number(btn.dataset.idx)
+    if (!Number.isFinite(idx) || !suggestItems[idx]) return
+    pickSuggestion(suggestItems[idx])
+  })
+  modal.querySelector('.client-stmt-go')?.addEventListener('click', () => {
+    closeSuggest()
+    runSearch()
+  })
+  modal.querySelectorAll('.client-stmt-close, .client-stmt-close2').forEach((b) => {
+    b.addEventListener('click', tearDown)
+  })
+  modal.querySelector('.client-stmt-print')?.addEventListener('click', async () => {
+    const q = searchIn.value.trim()
+    if (!q || !lastHits.length) {
+      window.alert('Pehle search karein.')
+      return
+    }
+    const range = await promptDateRangeModal({
+      title: 'Client statement print',
+      subtitle: 'From — To (poori history ke liye pehle se dates chhod dein)',
+    })
+    if (!range) return
+    const ledger = refreshLedgerRowAmounts(
+      buildClientSearchLedgerRows(lastHits, range.fromIso, range.toIso),
+    )
+    if (!ledger.length) {
+      window.alert('Is date range mein koi record nahi mila.')
+      return
+    }
+    const outstanding = computeClientDetailOutstanding(lastHits)
+    printClientLedgerDocument({
+      title: `Client detail — ${q}`,
+      subTitle: 'CLIENT DETAIL STATEMENT',
+      clientLine: `Search: ${q} | Period: ${range.fromIso} → ${range.toIso} | appl · wepl · gen`,
+      ledger,
+      showSrcCol: true,
+      outstandingBalance: outstanding,
+    })
+    opts.onRefresh?.()
+  })
+
+  queueMicrotask(() => {
+    overlay.classList.add('is-open')
+    searchIn.focus()
+    runSearch()
   })
 }
 
@@ -6255,7 +7099,7 @@ function makeSearchScreen(opts: { onBack: () => void; onEdit: (e: Entry) => void
       <div class="search-dl"><span class="search-dk">Dues</span><span class="search-dv">${formatRs(e.totalDues)}</span></div>
       <div class="search-dl"><span class="search-dk">Date</span><span class="search-dv">${formatDateDisplay(e.entryDate)}</span></div>`
     detailActs.innerHTML = `
-      <button type="button" class="btn primary sm sdet-edit">${ICON_DOC}<span>Edit</span></button>
+      <button type="button" class="btn primary sm sdet-edit btn-ico-lbl">${ICON_EDIT_IMG}<span>Edit</span></button>
       <button type="button" class="btn ghost sm sdet-bill">Print bill</button>
       <button type="button" class="btn ghost sm sdet-detail">Print detail</button>
       <button type="button" class="btn danger sm sdet-bin">Move to bin</button>`
@@ -6437,7 +7281,7 @@ function makePoliceStationSearchScreen(opts: { onBack: () => void; onEdit: (e: E
       <div class="search-dl"><span class="search-dk">Status</span><span class="search-dv"><span class="pill ${st.toLowerCase()}">${st}</span></span></div>
       <div class="search-dl"><span class="search-dk">Date</span><span class="search-dv">${formatDateDisplay(e.entryDate)}</span></div>`
     detailActs.innerHTML = `
-      <button type="button" class="btn primary sm sdet-edit">${ICON_DOC}<span>Edit</span></button>
+      <button type="button" class="btn primary sm sdet-edit btn-ico-lbl">${ICON_EDIT_IMG}<span>Edit</span></button>
       <button type="button" class="btn ghost sm sdet-bill">Print bill</button>
       <button type="button" class="btn ghost sm sdet-detail">Print detail</button>`
     detailActs.querySelector('.sdet-edit')?.addEventListener('click', () => opts.onEdit(e))
@@ -6552,7 +7396,7 @@ function makeRecycleScreen(opts: { onBack: () => void; onChanged: () => void }) 
             <td>${esc(r.entry.mobileNumber || '—')}</td>
             <td class="recycle-actions">
               <button type="button" class="btn primary sm" data-act="restore" data-id="${id}">Restore</button>
-              <button type="button" class="btn ghost sm" data-act="purge" data-id="${id}">Delete forever</button>
+              ${deleteIconBtnHtml('btn ghost sm', `data-act="purge" data-id="${escAttr(id)}"`, 'Delete forever')}
             </td>
           </tr>`
           })
@@ -6764,7 +7608,7 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
       b.classList.toggle('is-active', b.getAttribute('data-mode') === mode)
     })
     customRow.classList.toggle('is-hidden', mode !== 'custom')
-    clientSearchRow.classList.toggle('is-hidden', mode !== 'clientDetail')
+    clientSearchRow.classList.add('is-hidden')
   }
 
   const repRender = () => {
@@ -6772,77 +7616,17 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
     const esc = (s: string) => s.replaceAll('<', '&lt;')
 
     if (mode === 'clientDetail') {
-      const q = clientDetailSearchIn.value
-      const hits = collectClientDetailHits(q)
-      let totalDebit = 0
-      const noteLine = (parts: string[]) => parts.map((x) => x.trim()).filter(Boolean).join(' · ') || '—'
-      const qDisp = q.trim() || '—'
-      for (const h of hits) {
-        if (h.kind === 'app') totalDebit += h.entry.salePrice ?? 0
-        else if (h.kind === 'weapon') totalDebit += h.line.salePrice ?? 0
-        else totalDebit += h.row.amount
-      }
+      printRow.classList.add('is-hidden')
       summary.textContent =
-        hits.length === 0 && !q.trim()
-          ? `Client Detail Statement | Search likhein (name, reference, weapon client, general dues). Print par date range + debit/credit statement.`
-          : `Client Detail Statement | Search: "${qDisp}" | Records: ${hits.length} | Debit (charges): ${formatRs(totalDebit)} | Print for wasool (credit) + balance`
-      if (theadTr) {
-        theadTr.innerHTML = `<th>Cat</th><th>Date</th><th>Name / Reference</th><th>Note</th><th>Debit</th><th>Credit</th><th>Action</th>`
-      }
+        'Client Detail Statement — orange button click karein: search popup (14×7), teen sources (appl · wepl · gen), balance Pending Dues jaisa.'
+      if (theadTr) theadTr.innerHTML = `<th>Info</th>`
       if (tbody) {
-        tbody.innerHTML =
-          hits
-            .map((h) => {
-              const meta = clientDetailGroupMeta(h)
-              const cat = clientDetailSrcTag(h.kind)
-              if (h.kind === 'app') {
-                const e = h.entry
-                const debit = e.salePrice ?? 0
-                totalDebit += debit
-                const note = noteLine([e.trackingId, e.weaponNumber, e.category])
-                return `<tr data-entry-id="${e.id}">
-            <td>${esc(cat)}</td>
-            <td>${esc(formatDateDisplay(e.entryDate))}</td>
-            <td>${esc(meta.nameRef)}</td>
-            <td>${esc(note)}</td>
-            <td>${e.salePrice !== null ? formatRs(e.salePrice) : '—'}</td>
-            <td>—</td>
-            ${entryActionCellHtml(e, { showRecycle: true })}
-          </tr>`
-              }
-              if (h.kind === 'weapon') {
-                const l = h.line
-                const debit = l.salePrice ?? 0
-                totalDebit += debit
-                const wn = (l.weaponNumber || '').trim() || '—'
-                return `<tr>
-            <td>${esc(cat)}</td>
-            <td>${esc(formatDateDisplay(l.entryDate))}</td>
-            <td>${esc(meta.nameRef)}</td>
-            <td>${esc(wn)}</td>
-            <td>${l.salePrice !== null ? formatRs(l.salePrice) : '—'}</td>
-            <td>—</td>
-            <td class="td-actions">—</td>
-          </tr>`
-              }
-              const r = h.row
-              totalDebit += r.amount
-              return `<tr>
-            <td>${esc(cat)}</td>
-            <td>${esc(formatDateDisplay(r.entryDate))}</td>
-            <td>${esc(meta.nameRef)}</td>
-            <td>${esc((r.description || '').trim() || '—')}</td>
-            <td>${formatRs(r.amount)}</td>
-            <td>—</td>
-            <td class="td-actions">—</td>
-          </tr>`
-            })
-            .join('') ||
-          `<tr><td colspan="7" class="empty">${q.trim() ? 'No matching records.' : 'Type a search term — e.g. janzada — for application, weapon allot, and general dues.'}</td></tr>`
+        tbody.innerHTML = `<tr><td class="empty">Client Detail Statement par click karein — naam search popup khulega.</td></tr>`
       }
       return
     }
 
+    printRow.classList.remove('is-hidden')
     const base = loadEntries().slice().reverse()
     const filtered = filterReportEntries(base, mode, fromD.value, toD.value)
     const totalSale = filtered.reduce((s, e) => s + (e.salePrice ?? 0), 0)
@@ -6884,15 +7668,16 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
     if (!m) return
     mode = m
     syncFiltActive()
-    if (m === 'clientDetail') queueMicrotask(() => clientDetailSearchIn.focus())
+    if (m === 'clientDetail') {
+      openClientDetailStatementModal({ onRefresh: repRender })
+      return
+    }
     repRender()
   })
   fromD.addEventListener('change', () => repRender())
   toD.addEventListener('change', () => repRender())
-  clientDetailSearchIn.addEventListener('input', () => repRender())
-
   printB.addEventListener('click', () => {
-    if (mode === 'clientDetail') void printClientDetailStatement(clientDetailSearchIn.value)
+    if (mode === 'clientDetail') openClientDetailStatementModal({ onRefresh: repRender })
     else printAccountStatement(mode, fromD.value, toD.value)
   })
 
@@ -6970,11 +7755,11 @@ function makeReportsScreen(opts: { onBack: () => void; onEdit: (e: Entry) => voi
 
   syncFiltActive()
   repRender()
+  if (mode === 'clientDetail') {
+    queueMicrotask(() => openClientDetailStatementModal({ onRefresh: repRender }))
+  }
   wrap.append(head, filt, customRow, clientSearchRow, printRow, tool, tableWrap)
   return wrap
 }
-
-/** Referenced so paid-toward-sale helpers stay available for dues/history UI. */
-void { entryPaidTowardSale, weaponLinePaidTowardSale, generalDuesPaidAmount }
 
 render()
